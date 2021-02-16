@@ -1,0 +1,3 @@
+[submodule "seq2wav"]
+	path = seq2wav
+	url = https://bitbucket.org/ahigerd/seq2wav

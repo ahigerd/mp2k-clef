@@ -1,0 +1,32 @@
+# temporary files
+*.tmp
+*.sw*
+
+# audio files
+*.mp3
+*.m4a
+*.wav
+*.m3u
+
+# build temporaries
+*.o
+*.obj
+*.exp
+*.lib
+build
+build_win
+
+# build outputs
+depends.mak
+include
+*2wav
+*2wav_d
+*.dll
+*.a
+*.so
+*.exe
+
+# external dependencies
+plugins/foobar2000
+plugins/pfc
+plugins/libPPUI
