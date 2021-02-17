@@ -4,6 +4,7 @@
 #include "utility.h"
 #include <iostream>
 #include <fstream>
+#include <memory>
 #include <cstdlib>
 
 int main(int argc, char** argv)
@@ -18,17 +19,30 @@ int main(int argc, char** argv)
   }
   std::cout << "Read " << argv[1] << ": " << rom.rom.size() << " bytes." << std::endl;
   if (argc > 2) {
-    uint32_t index = std::atoi(argv[2]);
     SongTable st(rom.findSongTable(-1));
-    SongData sd = st.songFromTable(index);
-    bool ok = rom.checkSong(sd.addr, true);
+    std::string tag(argv[2]);
+    std::unique_ptr<SongData> sd;
+    uint32_t index = ~0;
+    if (tag.size() > 2 && tag[1] == 'x') {
+      uint32_t addr = std::strtol(argv[2] + 2, nullptr, 16);
+      sd = std::make_unique<SongData>(st.songAt(addr));
+    } else {
+      index = std::atoi(argv[2]);
+      sd = std::make_unique<SongData>(st.songFromTable(index));
+    }
+    bool ok = rom.checkSong(sd->addr, true);
     if (!ok) {
       std::cout << "Check failed." << std::endl;
       return 1;
     }
     std::cout << "Validated." << std::endl;
-    std::cout << "Song #" << index << ": 0x" << std::hex << sd.addr << std::endl;
-    std::cout << std::dec << "\tTracks: " << sd.numTracks() << std::endl;
+    if (index == ~0) {
+      std::cout << "Song @";
+    } else {
+      std::cout << "Song #" << index << ":";
+    }
+    std::cout << " 0x" << std::hex << sd->addr << std::endl;
+    std::cout << std::dec << "\tTracks: " << sd->numTracks() << std::endl;
     return 0;
   }
   //SongTable st(rom.findSongTable(-1));
