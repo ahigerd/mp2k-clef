@@ -18,7 +18,7 @@ public:
     const uint32_t addr;
   };
 
-  ROMFile() = default;
+  ROMFile();
   ROMFile(const ROMFile& other) = delete;
   ROMFile(ROMFile&& other) = delete;
   ROMFile& operator=(const ROMFile& other) = delete;
@@ -29,6 +29,7 @@ public:
   bool checkSong(uint32_t addr, bool deep = true) const;
 
   std::vector<uint8_t> rom;
+  uint32_t sampleRate;
 
   inline uint8_t operator[](uint32_t addr) const { return read<uint8_t>(addr); }
   template<typename T> inline T read(uint32_t addr) const {

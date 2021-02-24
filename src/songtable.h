@@ -15,9 +15,9 @@ public:
   uint32_t tableStart, tableEnd;
   std::vector<uint32_t> songs;
 
-  SongData songAt(uint32_t addr) const;
-  SongData song(size_t index) const;
-  SongData songFromTable(size_t index) const;
+  SongData* songAt(uint32_t addr) const;
+  SongData* song(size_t index) const;
+  SongData* songFromTable(size_t index) const;
 };
 
 #endif

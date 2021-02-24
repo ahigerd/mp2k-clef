@@ -8,17 +8,17 @@ SongTable::SongTable(const ROMFile* rom)
   // initializers only
 }
 
-SongData SongTable::songAt(uint32_t addr) const
+SongData* SongTable::songAt(uint32_t addr) const
 {
-  return SongData(rom, addr);
+  return new SongData(rom, addr);
 }
 
-SongData SongTable::song(size_t index) const
+SongData* SongTable::song(size_t index) const
 {
   return songAt(songs.at(index));
 }
 
-SongData SongTable::songFromTable(size_t index) const
+SongData* SongTable::songFromTable(size_t index) const
 {
   uint32_t ptr = tableStart + 8 * index;
   if (ptr >= tableEnd) {

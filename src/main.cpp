@@ -1,11 +1,15 @@
 #include "romfile.h"
 #include "songtable.h"
 #include "songdata.h"
+#include "instrumentdata.h"
 #include "utility.h"
+#include "synth/synthcontext.h"
+#include "riffwriter.h"
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <cstdlib>
+#include <sstream>
 
 int main(int argc, char** argv)
 {
@@ -19,16 +23,17 @@ int main(int argc, char** argv)
   }
   std::cout << "Read " << argv[1] << ": " << rom.rom.size() << " bytes." << std::endl;
   if (argc > 2) {
+    SynthContext ctx(42048);
     SongTable st(rom.findSongTable(-1));
     std::string tag(argv[2]);
     std::unique_ptr<SongData> sd;
     uint32_t index = ~0;
     if (tag.size() > 2 && tag[1] == 'x') {
       uint32_t addr = std::strtol(argv[2] + 2, nullptr, 16);
-      sd = std::make_unique<SongData>(st.songAt(addr));
+      sd.reset(st.songAt(addr));
     } else {
       index = std::atoi(argv[2]);
-      sd = std::make_unique<SongData>(st.songFromTable(index));
+      sd.reset(st.songFromTable(index));
     }
     bool ok = rom.checkSong(sd->addr, true);
     if (!ok) {
@@ -43,6 +48,18 @@ int main(int argc, char** argv)
     }
     std::cout << " 0x" << std::hex << sd->addr << std::endl;
     std::cout << std::dec << "\tTracks: " << sd->numTracks() << std::endl;
+    for (int i = 0; i < sd->numTracks(); i++) {
+      ctx.addChannel(sd->getTrack(i));
+    }
+
+    std::ostringstream fnss;
+    fnss << argv[1] << "." << argv[2] << ".wav";
+    std::string filename = fnss.str();
+    std::cerr << "Writing " << (int(ctx.maximumTime() * 10) * .1) << " seconds to \"" << filename << "\"..." << std::endl;
+    RiffWriter riff(ctx.sampleRate, true);
+    riff.open(filename);
+    ctx.save(&riff);
+    riff.close();
     return 0;
   }
   //SongTable st(rom.findSongTable(-1));

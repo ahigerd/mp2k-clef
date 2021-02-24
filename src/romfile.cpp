@@ -17,6 +17,12 @@ ROMFile::BadAccess::BadAccess(uint32_t addr)
   // initializers only
 }
 
+ROMFile::ROMFile()
+: sampleRate(13379)
+{
+  // initializers only
+}
+
 uint32_t ROMFile::cleanPointer(uint32_t addr, uint32_t size, bool align) const
 {
   uint32_t mask = align ? 0xFE000003 : 0xFE000000;
