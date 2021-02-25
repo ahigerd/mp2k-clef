@@ -329,9 +329,8 @@ bool TrackData::isFinished() const
 
 std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
 {
-  SequenceEvent* result = nullptr;
   bool didGoto = false;
-  while (!result && !isFinished()) {
+  while (!isFinished() && !pendingEvents.size()) {
     const Mp2kEvent& event = events[playIndex++];
     for (int i = song->tempos.size() - 1; i >= 0; --i) {
       const auto& tempo = song->tempos[i];
@@ -348,7 +347,6 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
     if (event.type == Mp2kEvent::Stop) {
       stopped = true;
     } else if (event.type == Mp2kEvent::Rest) {
-      //std::cout << std::hex << (intptr_t)this << " rest " << std::dec << duration << std::endl;
       playTime += duration;
     } else if (event.type == Mp2kEvent::Goto) {
       if (didGoto) {
@@ -362,28 +360,39 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
       }
     } else if (event.type == Mp2kEvent::Param) {
       switch (event.param) {
-        case 0xBB: // TEMPO
-          // simplification of value / 75.0 * (1.0 / 60.0)
-          secPerTick = event.value / 4500.0 * 2; // TODO: the 2 factor is a hack, fix when engine rate is available
+        using namespace EventType;
+        case TEMPO:
+          // simplification of 1.0 / (value / 75.0 * 60.0)
+          secPerTick = 0.8 * 1.6 / event.value; // TODO: fix base rate
           song->tempos.emplace_back(playTime, secPerTick);
           std::cout << (intptr_t)this << ": set tempo " << secPerTick << " @ " << playTime << std::endl;
           break;
-        case 0xBC: // KEYSH
+        case KEYSH:
           transpose = event.value;
           break;
-        case 0xBD: // VOICE
+        case VOICE:
           std::cout << "Using instrument " << std::dec << (int)event.value << std::endl;
           currentInstrument = song->getInstrument(event.value);
           if (currentInstrument) {
             releaseTime = currentInstrument->release;
           }
           break;
-        case 0xBE: // VOL
-          result = new ChannelEvent('gain', event.value / 255.0);
-          //std::cout << "VOL " << (int)event.value << std::endl;
+        case VOL:
+          pendingEvents.emplace_back(new ChannelEvent('gain', event.value / 255.0));
+          pendingEvents.back()->timestamp = playTime;
           break;
-        case 0xC1: // BENDR
-          bendRange = double(event.value);
+        case BENDR:
+          bendRange = event.value;
+          break;
+        case BEND:
+          {
+            double bend = noteToFreq(69 + bendRange * (event.value - 64.0) / 64.0) / 440.0;
+            for (const auto& it : activeNotes) {
+              ModulatorEvent* modEvent = new ModulatorEvent(it.second.playbackID, 'bend', bend);
+              modEvent->timestamp = playTime;
+              pendingEvents.emplace_back(modEvent);
+            }
+          }
           break;
         default:
           // TODO
@@ -393,7 +402,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
       uint8_t note = event.param + transpose;
       // PSG instruments are mutually exclusive
       bool psg = currentInstrument->type & 0x7;
-      uint8_t noteID = psg ? currentInstrument->type : note;
+      uint8_t noteID = psg ? 0x80 + currentInstrument->type : note;
       auto& active = psg ? song->activePsg : activeNotes;
       auto iter = active.find(noteID);
       if (iter != active.end() && (psg || iter->second.releaseTime == 0 || iter->second.endTime > playTime)) {
@@ -407,40 +416,41 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           iter->second.endTime = playTime + (iter->second.endTime - iter->second.releaseTime);
           iter->second.releaseTime = playTime;
         }
-        result = killEvent;
-        --playIndex;
+        pendingEvents.emplace_back(killEvent);
       }
-      if (!result) {
-        result = currentInstrument->makeEvent(1 /* volume */, note, event.value, duration);
-        if (result) {
-          double noteReleaseTime = duration >= 0 ? playTime + duration : 0;
-          double endTime = noteReleaseTime + releaseTime;
-          active[noteID] = (ActiveNote){
-            dynamic_cast<BaseNoteEvent*>(result)->playbackID,
-            noteReleaseTime,
-            endTime,
-            false,
-          };
-          if (psg) {
-            activeNotes[noteID] = active[noteID];
-          }
+      SequenceEvent* noteEvent = currentInstrument->makeEvent(1 /* volume */, note, event.value, duration);
+      noteEvent->timestamp = playTime;
+      if (noteEvent) {
+        double noteReleaseTime = duration >= 0 ? playTime + duration : 0;
+        double endTime = noteReleaseTime + releaseTime;
+        active[noteID] = (ActiveNote){
+          dynamic_cast<BaseNoteEvent*>(noteEvent)->playbackID,
+          noteReleaseTime,
+          endTime,
+          false,
+        };
+        if (psg) {
+          activeNotes[noteID] = active[noteID];
         }
+        pendingEvents.emplace_back(noteEvent);
       }
-    }
-    if (result) {
-      result->timestamp = playTime;
     }
   }
-  if (!result && isFinished()) {
-    if (activeNotes.size()) {
+  if (isFinished()) {
+    while (activeNotes.size()) {
       auto iter = activeNotes.begin();
-      KillEvent* kill = new KillEvent(iter->second.playbackID, playTime);
-      kill->immediate = true;
-      result = kill;
+      KillEvent* killEvent = new KillEvent(iter->second.playbackID, playTime);
+      killEvent->immediate = true;
+      pendingEvents.emplace_back(killEvent);
       activeNotes.erase(iter);
     }
   }
-  return std::shared_ptr<SequenceEvent>(result);
+  if (pendingEvents.size()) {
+    auto result = pendingEvents.at(0);
+    pendingEvents.erase(pendingEvents.begin());
+    return result;
+  }
+  return nullptr;
 }
 
 SongData::SongData(const ROMFile* rom, uint32_t addr)

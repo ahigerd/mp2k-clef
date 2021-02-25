@@ -157,8 +157,6 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     double sampleRate = rom->sampleRate;
     if (type == GBSample) {
       sampleRate = 4186.0;
-      //std::cout << "GBSample " << std::hex << sampleStart << std::endl;
-      //std::cout << std::dec << attack << " " << decay << " " << sustain << " " << release << std::endl;
     } else {
       pan = rom->read<uint32_t>(addr + 3) ^ 0x80;
       forcePan = !(pan & 0x80);
@@ -182,8 +180,6 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     if (sampleStart + sampleLen > rom->rom.size()) {
       throw ROMFile::BadAccess(sampleStart + sampleLen);
     }
-    //std::cout << "Loading " << type << " sample " << std::hex << sampleAddr << " (" << std::dec << sampleLen << " bytes) " << sampleRate << "Hz" << std::endl;
-    //std::cout << "\tloop " << loopStart << " - " << loopEnd << std::endl;
     sample = PcmCodec(type == GBSample ? 4 : 8).decodeRange(rom->rom.begin() + sampleStart, rom->rom.begin() + sampleStart + sampleLen, sampleID);
     sample->sampleRate = sampleRate;
     sample->loopStart = loopStart;
@@ -200,7 +196,6 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
 
 SequenceEvent* SampleInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
-  //if (type != GBSample) return nullptr;
   if (key & 0x80) return nullptr;
   static const double cFreq = 261.6256;
   double freq = noteToFreq((int8_t)key);
@@ -210,7 +205,6 @@ SequenceEvent* SampleInstrument::makeEvent(double volume, uint8_t key, uint8_t v
   event->sampleID = sample->sampleID;
   // TODO: velocity accuracy
   event->volume = volume * (vel / 127.0);
-  //std::cout << "Play sample " << std::hex << (sample->sampleID & 0xFFFFFFFF) << std::dec << " " << event->pitchBend << " " << (int)key << " v=" << (int)vel << " len=" << len << std::endl;
   return addEnvelope(event, volume);
 }
 
@@ -225,9 +219,8 @@ PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
 
 SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
-  //return nullptr;
   OscillatorEvent* event = new OscillatorEvent;
-  event->duration = len;
+  event->duration = (gate && len > gate) ? gate : len;
   event->frequency = noteToFreq(key);
   if (type == Noise) {
     if (mode & 1) {
@@ -251,7 +244,6 @@ SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel,
   */
   // TODO: velocity accuracy
   event->volume = volume * (vel / 127.0) * 0.5;
-  std::cout << "osc " << (int)event->waveformID << ": " << (int)key << " (" << event->frequency << " Hz)" << std::endl;
   return addEnvelope(event, volume);
 }
 

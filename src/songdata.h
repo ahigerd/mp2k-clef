@@ -54,6 +54,7 @@ protected:
   double lengthCache;
   MpInstrument* currentInstrument;
   std::vector<Mp2kEvent> events;
+  std::vector<std::shared_ptr<SequenceEvent>> pendingEvents;
   std::unordered_map<uint8_t, ActiveNote> activeNotes;
   double bendRange;
   double releaseTime;
