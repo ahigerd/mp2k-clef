@@ -25,13 +25,20 @@ struct Mp2kEvent {
 
 class TrackData : public ITrack {
 public:
-  TrackData(SongData* song, uint32_t addr, MpInstrument* defaultInst);
+  struct ActiveNote {
+    uint64_t playbackID;
+    double releaseTime, endTime;
+    bool released;
+  };
+
+  TrackData(SongData* song, int index, uint32_t addr, MpInstrument* defaultInst);
   ~TrackData();
 
   virtual bool isFinished() const;
 
   virtual double length() const;
 
+  int trackIndex;
   SongData* const song;
   const uint32_t addr;
   bool hasLoop;
@@ -46,11 +53,6 @@ protected:
   double lengthCache;
   MpInstrument* currentInstrument;
   std::vector<Mp2kEvent> events;
-  struct ActiveNote {
-    uint64_t playbackID;
-    double releaseTime, endTime;
-    bool released;
-  };
   std::unordered_map<uint8_t, ActiveNote> activeNotes;
   double bendRange;
   double releaseTime;
@@ -73,6 +75,7 @@ public:
   InstrumentData instruments;
 
   std::vector<std::pair<double, double>> tempos;
+  std::unordered_map<uint8_t, TrackData::ActiveNote> activePsg;
 
 private:
   bool hasLoop;

@@ -79,11 +79,15 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
     switch (type) {
       case Sample:
       case GBSample:
+      case GBSample + 0x10:
       case FixedSample:
         return new SampleInstrument(rom, addr);
       case Square1:
+      case Square1 + 0x10:
       case Square2:
+      case Square2 + 0x10:
       case Noise:
+      case Noise + 0x10:
         return new PSGInstrument(rom, addr);
       case KeySplit:
       case Percussion:
@@ -91,6 +95,7 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
           return new SplitInstrument(rom, addr);
         }
       default:
+        std::cout << "???? " << std::dec << (int)type << std::endl;
         return nullptr;
     }
   } catch (ROMFile::BadAccess& e) {
@@ -107,7 +112,7 @@ MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
 {
   if (type & 0x7) {
     type = Type(type & 0x7);
-    attack = (7 - (rom->read<uint8_t>(addr + 8) & 0x7)) / 7.0;
+    attack = (rom->read<uint8_t>(addr + 8) & 0x7) / 7.0;
     decay = rom->read<uint8_t>(addr + 8) / 60.0;
     sustain = rom->read<uint8_t>(addr + 8) / 255.0;
     release = rom->read<uint8_t>(addr + 8) / 60.0;
@@ -151,7 +156,9 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     int loopEnd = 32;
     double sampleRate = rom->sampleRate;
     if (type == GBSample) {
-      sampleRate = 4194304.0 / rom->read<uint8_t>(addr + 2);
+      sampleRate = 4186.0;
+      //std::cout << "GBSample " << std::hex << sampleStart << std::endl;
+      //std::cout << std::dec << attack << " " << decay << " " << sustain << " " << release << std::endl;
     } else {
       pan = rom->read<uint32_t>(addr + 3) ^ 0x80;
       forcePan = !(pan & 0x80);
@@ -175,8 +182,8 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     if (sampleStart + sampleLen > rom->rom.size()) {
       throw ROMFile::BadAccess(sampleStart + sampleLen);
     }
-    std::cout << "Loading " << type << " sample " << std::hex << sampleAddr << " (" << std::dec << sampleLen << " bytes) " << sampleRate << "Hz" << std::endl;
-    std::cout << "\tloop " << loopStart << " - " << loopEnd << std::endl;
+    //std::cout << "Loading " << type << " sample " << std::hex << sampleAddr << " (" << std::dec << sampleLen << " bytes) " << sampleRate << "Hz" << std::endl;
+    //std::cout << "\tloop " << loopStart << " - " << loopEnd << std::endl;
     sample = PcmCodec(type == GBSample ? 4 : 8).decodeRange(rom->rom.begin() + sampleStart, rom->rom.begin() + sampleStart + sampleLen, sampleID);
     sample->sampleRate = sampleRate;
     sample->loopStart = loopStart;
@@ -193,7 +200,7 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
 
 SequenceEvent* SampleInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
-  if (type == GBSample) return nullptr;
+  //if (type != GBSample) return nullptr;
   if (key & 0x80) return nullptr;
   static const double cFreq = 261.6256;
   double freq = noteToFreq((int8_t)key);
@@ -201,9 +208,9 @@ SequenceEvent* SampleInstrument::makeEvent(double volume, uint8_t key, uint8_t v
   event->duration = len;
   event->pitchBend = freq / cFreq;
   event->sampleID = sample->sampleID;
-  // TODO: vel
-  event->volume = volume;
-  std::cout << "Play sample " << std::hex << (sample->sampleID & 0xFFFFFFFF) << std::dec << " " << event->pitchBend << " " << (int)key << " v=" << (int)vel << std::endl;
+  // TODO: velocity accuracy
+  event->volume = volume * (vel / 127.0);
+  //std::cout << "Play sample " << std::hex << (sample->sampleID & 0xFFFFFFFF) << std::dec << " " << event->pitchBend << " " << (int)key << " v=" << (int)vel << " len=" << len << std::endl;
   return addEnvelope(event, volume);
 }
 
@@ -218,7 +225,7 @@ PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
 
 SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
-  return nullptr;
+  //return nullptr;
   OscillatorEvent* event = new OscillatorEvent;
   event->duration = len;
   event->frequency = noteToFreq(key);
@@ -242,8 +249,8 @@ SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel,
     node = new SweepNode(ctx, node, sweep);
   }
   */
-  // TODO: vel
-  event->volume = volume;
+  // TODO: velocity accuracy
+  event->volume = volume * (vel / 127.0) * 0.5;
   std::cout << "osc " << (int)event->waveformID << ": " << (int)key << " (" << event->frequency << " Hz)" << std::endl;
   return addEnvelope(event, volume);
 }
@@ -290,6 +297,7 @@ InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
     if (inst) {
       instruments.emplace_back(inst);
     } else {
+      std::cout << "unknown/bad" << std::endl;
       instruments.emplace_back(nullptr);
     }
     addr += 12;
