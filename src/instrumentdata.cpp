@@ -95,7 +95,7 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
           return new SplitInstrument(rom, addr);
         }
       default:
-        std::cout << "???? " << std::dec << (int)type << std::endl;
+        //std::cout << "???? " << std::dec << (int)type << std::endl;
         return nullptr;
     }
   } catch (ROMFile::BadAccess& e) {
@@ -258,8 +258,6 @@ SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel,
 SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
 : MpInstrument(rom, addr)
 {
-  std::cout << "split " << std::hex << (addr + 4) << std::endl;
-  std::cout << rom->read<uint32_t>(addr + 4) << std::endl;
   uint32_t splitAddr = rom->readPointer(0x08000000 | (addr + 4));
   if (type == Percussion) {
     for (int i = 0; i < 128; i++) {
@@ -297,7 +295,7 @@ InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
     if (inst) {
       instruments.emplace_back(inst);
     } else {
-      std::cout << "unknown/bad" << std::endl;
+      //std::cout << "unknown/bad" << std::endl;
       instruments.emplace_back(nullptr);
     }
     addr += 12;

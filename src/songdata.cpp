@@ -18,6 +18,7 @@ namespace EventType {
     PATT,
     PEND,
     REPT,
+    STOP,
     MEMACC = 0xB9,
     PRIO,
     TEMPO,
@@ -39,7 +40,7 @@ namespace EventType {
 
   // starts at 0xB1
   static std::string names[] = {
-    "FINE", "GOTO", "PATT", "PEND", "REPT", "", "", "", "MEMACC", "PRIO",
+    "FINE", "GOTO", "PATT", "PEND", "REPT", "STOP", "", "", "MEMACC", "PRIO",
     "TEMPO", "KEYSH", "VOICE", "VOL", "PAN", "BEND", "BENDR", "LFOS", "LFODL",
     "MOD", "MODT", "", "", "TUNE", "", "", "", "", "XCMD", "EOT", "TIE",
   };
@@ -58,6 +59,7 @@ namespace EventType {
     // return -1 = variable length
     switch (opcode) {
       case FINE:
+      case STOP:
       case PEND: return 1;
       case GOTO:
       case PATT: return 5;
@@ -118,7 +120,7 @@ struct RawEvent {
 
 TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* defaultInst)
 : trackIndex(index), song(song), addr(addr), hasLoop(true), playIndex(0), playTime(0), secPerTick(1.0 / 75.0),
-  lengthCache(-1), currentInstrument(defaultInst), bendRange(2), transpose(0)
+  lengthCache(-1), currentInstrument(defaultInst), bendRange(2), transpose(0), stopped(false)
 {
   std::unordered_map<uint64_t, size_t> addrToIndex;
   std::unordered_map<size_t, uint64_t> indexToAddr;
@@ -133,6 +135,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
   uint32_t returnAddr = 0;
   uint32_t repeatAddr = 0;
   uint8_t repeatCount = 1;
+  int ts = 0;
   while (true) {
     raw.addr = pos;
     raw.opcode = r[pos];
@@ -187,7 +190,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
         raw.args.push_back(r[pos + i]);
       }
     }
-    std::cout << "[" << trackIndex << "] " << raw.render() << std::endl;
+    std::cout << "[" << trackIndex << "] " << std::setw(6) << ts << " | " << raw.render() << std::endl;
     pos += eventSize;
     Mp2kEvent ev;
     ev.effAddr = (uint64_t(returnAddr) << 32) | raw.addr;
@@ -200,6 +203,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
     if (raw.opcode < 0xB1) {
       ev.type = Mp2kEvent::Rest;
       ev.duration = noteLength[raw.opcode - 0x81 + 2];
+      ts += ev.duration;
       events.push_back(ev);
     } else if (raw.opcode >= 0xCE) { // EOT / TIE / NOTE
       running = raw.opcode;
@@ -214,9 +218,13 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
       ev.duration = noteLen;
       events.push_back(ev);
     } else switch (raw.opcode) {
-      case 0xB1: // FINE
+      using namespace EventType;
+      case FINE:
+      case STOP:
+        ev.type = Mp2kEvent::Stop;
+        events.push_back(ev);
         return;
-      case 0xB2: // GOTO
+      case GOTO:
         {
           uint64_t effAddr = (uint64_t(returnAddr) << 32) | raw.args[0];
           if (addrToIndex.count(effAddr)) {
@@ -231,7 +239,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
         // Skip decoding forward to the goto target
         pos = raw.args[0];
         break;
-      case 0xB3: // PATT
+      case PATT:
         if (returnAddr) {
           throw std::runtime_error("nested pattern detected");
         }
@@ -239,7 +247,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
         returnAddr = pos;
         pos = raw.args[0];
         break;
-      case 0xB4: // PEND
+      case PEND:
         if (!returnAddr) {
           // PEND without a call stack is ignored
           continue;
@@ -248,7 +256,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
         pos = repeatCount > 0 ? repeatAddr : returnAddr;
         returnAddr = 0;
         break;
-      case 0xB5: // REPT
+      case REPT:
         if (returnAddr) {
           throw std::runtime_error("nested pattern detected");
         }
@@ -259,31 +267,30 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
           pos = repeatAddr;
         }
         break;
-      case 0xBA: // PRIO
+      case PRIO:
         // ignore
         break;
-      case 0xBD: // VOICE
-      case 0xBE: // VOL
-      case 0xBF: // PAN
-      case 0xC0: // BEND
-      case 0xC1: // BENDR
-      case 0xC4: // MOD
-      case 0xC8: // TUNE
+      case VOICE:
+      case VOL:
+      case PAN:
+      case BEND:
+      case BENDR:
+      case MOD:
+      case TUNE:
         running = raw.opcode;
         // fallthrough;
-      case 0xBB: // TEMPO
-      case 0xBC: // KEYSH
-      case 0xC2: // LFOS
-      case 0xC3: // LFODL
-      case 0xC5: // MODT
+      case TEMPO:
+      case KEYSH:
+      case LFOS:
+      case LFODL:
+      case MODT:
         ev.type = Mp2kEvent::Param;
         ev.param = raw.opcode;
         ev.value = raw.args[0];
         events.push_back(ev);
         break;
-      case 0xCD: // XCMD
+      case XCMD:
         // TODO
-      case 0xB6: // Unknown
       case 0xB9: // Unknown
       case 0xCB: // Unknown
       case 0xCC: // Unknown
@@ -317,7 +324,7 @@ double TrackData::length() const
 
 bool TrackData::isFinished() const
 {
-  return playIndex >= events.size() || playTime > length();
+  return stopped || playIndex >= events.size() || playTime > length();
 }
 
 std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
@@ -328,7 +335,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
     const Mp2kEvent& event = events[playIndex++];
     for (int i = song->tempos.size() - 1; i >= 0; --i) {
       const auto& tempo = song->tempos[i];
-      if (tempo.first < playTime) {
+      if (tempo.first <= playTime) {
         if (secPerTick != tempo.second) {
           // TODO: adjust remaining note play time
           secPerTick = tempo.second;
@@ -338,7 +345,9 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
       }
     }
     double duration = event.duration == 0xFF ? -1 : event.duration * secPerTick;
-    if (event.type == Mp2kEvent::Rest) {
+    if (event.type == Mp2kEvent::Stop) {
+      stopped = true;
+    } else if (event.type == Mp2kEvent::Rest) {
       //std::cout << std::hex << (intptr_t)this << " rest " << std::dec << duration << std::endl;
       playTime += duration;
     } else if (event.type == Mp2kEvent::Goto) {
@@ -412,6 +421,9 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
             endTime,
             false,
           };
+          if (psg) {
+            activeNotes[noteID] = active[noteID];
+          }
         }
       }
     }
@@ -426,13 +438,6 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
       kill->immediate = true;
       result = kill;
       activeNotes.erase(iter);
-    }
-    if (!result && song->activePsg.size()) {
-      auto iter = song->activePsg.begin();
-      KillEvent* kill = new KillEvent(iter->second.playbackID, playTime);
-      kill->immediate = true;
-      result = kill;
-      song->activePsg.erase(iter);
     }
   }
   return std::shared_ptr<SequenceEvent>(result);

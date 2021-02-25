@@ -14,6 +14,7 @@ struct Mp2kEvent {
     Rest,
     Param,
     Goto,
+    Stop,
   };
 
   uint64_t effAddr;
@@ -57,6 +58,7 @@ protected:
   double bendRange;
   double releaseTime;
   uint8_t transpose;
+  bool stopped : 1;
 };
 
 class SongData : public BaseSequence<TrackData> {
