@@ -59,6 +59,7 @@ protected:
   double bendRange;
   double releaseTime;
   uint8_t transpose;
+  double tuning;
   bool stopped : 1;
 };
 

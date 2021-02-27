@@ -1,5 +1,6 @@
 #include "songdata.h"
 #include "romfile.h"
+#include "synth/audionode.h"
 #include <unordered_map>
 #include <sstream>
 #include <iomanip>
@@ -370,15 +371,22 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
         case KEYSH:
           transpose = event.value;
           break;
+        case TUNE:
+          tuning = (int(event.value) - 64) / 64.0;
+          break;
         case VOICE:
-          std::cout << "Using instrument " << std::dec << (int)event.value << std::endl;
           currentInstrument = song->getInstrument(event.value);
+          std::cout << "Using instrument " << std::dec << (int)event.value << " (" << (int)currentInstrument->type << ") " << std::endl;
           if (currentInstrument) {
             releaseTime = currentInstrument->release;
           }
           break;
+        case PAN:
+          pendingEvents.emplace_back(new ChannelEvent(AudioNode::Pan, event.value / 255.0));
+          pendingEvents.back()->timestamp = playTime;
+          break;
         case VOL:
-          pendingEvents.emplace_back(new ChannelEvent('gain', event.value / 255.0));
+          pendingEvents.emplace_back(new ChannelEvent(AudioNode::Gain, event.value / 255.0));
           pendingEvents.back()->timestamp = playTime;
           break;
         case BENDR:
@@ -418,7 +426,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
         }
         pendingEvents.emplace_back(killEvent);
       }
-      SequenceEvent* noteEvent = currentInstrument->makeEvent(1 /* volume */, note, event.value, duration);
+      SequenceEvent* noteEvent = currentInstrument->makeEvent(1 /* volume */, note + tuning, event.value, duration);
       noteEvent->timestamp = playTime;
       if (noteEvent) {
         double noteReleaseTime = duration >= 0 ? playTime + duration : 0;

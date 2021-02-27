@@ -113,15 +113,15 @@ MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
   if (type & 0x7) {
     type = Type(type & 0x7);
     attack = (rom->read<uint8_t>(addr + 8) & 0x7) / 7.0;
-    decay = rom->read<uint8_t>(addr + 8) / 60.0;
-    sustain = rom->read<uint8_t>(addr + 8) / 255.0;
-    release = rom->read<uint8_t>(addr + 8) / 60.0;
+    decay = rom->read<uint8_t>(addr + 9) / 60.0;
+    sustain = rom->read<uint8_t>(addr + 10) / 255.0;
+    release = rom->read<uint8_t>(addr + 11) / 60.0;
     gate = rom->read<uint8_t>(addr + 2) / 255.0;
   } else if (type == 0 || type == 8) {
     attack = (255 - rom->read<uint8_t>(addr + 8)) / 60.0;
-    decay = rom->read<uint8_t>(addr + 8) / 60.0;
-    sustain = rom->read<uint8_t>(addr + 8) / 255.0;
-    release = rom->read<uint8_t>(addr + 8) / 60.0;
+    decay = rom->read<uint8_t>(addr + 9) / 60.0;
+    sustain = rom->read<uint8_t>(addr + 10) / 255.0;
+    release = rom->read<uint8_t>(addr + 11) / 256.0;
   }
 }
 
@@ -137,7 +137,7 @@ SequenceEvent* MpInstrument::addEnvelope(SequenceEvent* event, double factor) co
     note->decay = decay * factor;
     note->sustain = sustain;
     note->release = release * factor;
-    note->expDecay = true;
+    note->expDecay = (type & 0x7) == 0;
   }
   return event;
 }
