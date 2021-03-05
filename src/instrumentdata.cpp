@@ -75,19 +75,16 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
     return nullptr;
   }
   uint8_t type = rom->read<uint8_t>(addr);
+  uint8_t normType = type & 0x7 ? type & 0x7 : type;
   try {
-    switch (type) {
+    switch (normType) {
       case Sample:
       case GBSample:
-      case GBSample + 0x10:
       case FixedSample:
         return new SampleInstrument(rom, addr);
       case Square1:
-      case Square1 + 0x10:
       case Square2:
-      case Square2 + 0x10:
       case Noise:
-      case Noise + 0x10:
         return new PSGInstrument(rom, addr);
       case KeySplit:
       case Percussion:
@@ -95,7 +92,7 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
           return new SplitInstrument(rom, addr);
         }
       default:
-        //std::cout << "???? " << std::dec << (int)type << std::endl;
+        std::cout << "???? " << std::hex << addr << " " << std::dec << (int)type << std::endl;
         return nullptr;
     }
   } catch (ROMFile::BadAccess& e) {
@@ -114,7 +111,7 @@ MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
     type = Type(type & 0x7);
     attack = (rom->read<uint8_t>(addr + 8) & 0x7) / 7.0;
     decay = rom->read<uint8_t>(addr + 9) / 60.0;
-    sustain = rom->read<uint8_t>(addr + 10) / 255.0;
+    sustain = rom->read<uint8_t>(addr + 10) / 15.0;
     release = rom->read<uint8_t>(addr + 11) / 60.0;
     gate = rom->read<uint8_t>(addr + 2) / 255.0;
   } else if (type == 0 || type == 8) {
@@ -133,7 +130,13 @@ SequenceEvent* MpInstrument::addEnvelope(SequenceEvent* event, double factor) co
   BaseNoteEvent* note = dynamic_cast<BaseNoteEvent*>(event);
   if (note) {
     note->useEnvelope = true;
-    note->attack = attack * factor;
+    if (attack) {
+      note->startGain = 1.0 - (60 * attack) / 255;
+      note->attack = attack * factor;
+    } else {
+      note->startGain = 1.0;
+      note->attack = 0;
+    }
     note->decay = decay * factor;
     note->sustain = sustain;
     note->release = release * factor;
@@ -186,7 +189,7 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     sample->loopEnd = loopEnd;
 
     std::ostringstream fnss;
-    fnss << "dump/sample-" << std::hex << (sampleAddr - 24) << ".wav";
+    fnss << "dump/sample-" << std::hex << (sampleAddr) << ".wav";
     RiffWriter dump(sampleRate, false);
     dump.open(fnss.str());
     dump.write(sample->channels[0]);
@@ -243,7 +246,7 @@ SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel,
   }
   */
   // TODO: velocity accuracy
-  event->volume = volume * (vel / 127.0) * 0.5;
+  event->volume = volume * (vel / 127.0) * 0.1;
   return addEnvelope(event, volume);
 }
 
@@ -287,7 +290,7 @@ InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
     if (inst) {
       instruments.emplace_back(inst);
     } else {
-      //std::cout << "unknown/bad" << std::endl;
+      std::cout << "unknown/bad" << std::endl;
       instruments.emplace_back(nullptr);
     }
     addr += 12;
