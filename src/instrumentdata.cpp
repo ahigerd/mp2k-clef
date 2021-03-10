@@ -6,6 +6,7 @@
 #include "seq/sequenceevent.h"
 #include "riffwriter.h"
 #include <sstream>
+#include <cmath>
 
 /*
 class SweepNode : public AudioNode
@@ -116,7 +117,7 @@ MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
     gate = rom->read<uint8_t>(addr + 2) / 255.0;
   } else if (type == 0 || type == 8) {
     attack = (255 - rom->read<uint8_t>(addr + 8)) / 60.0;
-    decay = rom->read<uint8_t>(addr + 9) / 60.0;
+    decay = rom->read<uint8_t>(addr + 9) / 256.0;
     sustain = rom->read<uint8_t>(addr + 10) / 255.0;
     release = rom->read<uint8_t>(addr + 11) / 256.0;
   }
@@ -137,10 +138,18 @@ SequenceEvent* MpInstrument::addEnvelope(SequenceEvent* event, double factor) co
       note->startGain = 1.0;
       note->attack = 0;
     }
-    note->decay = decay * factor;
     note->sustain = sustain;
-    note->release = release * factor;
     note->expDecay = (type & 0x7) == 0;
+    if (note->expDecay) {
+      // fitted using gradient descent
+      static const double COEF = 64.9707;
+      static const double ADJ = 1.4875;
+      note->decay = decay ? std::log(decay * factor) * COEF - ADJ : 0;
+      note->release = release ? std::log(release * factor) * COEF - ADJ : 0;
+    } else {
+      note->decay = decay * factor;
+      note->release = release * factor;
+    }
   }
   return event;
 }
