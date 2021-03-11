@@ -391,6 +391,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
         case VOL:
           pendingEvents.emplace_back(new ChannelEvent(AudioNode::Gain, 4 * event.value / 127.0));
           pendingEvents.back()->timestamp = playTime;
+          volume = event.value / 127.0;
           break;
         case BENDR:
           bendRange = event.value;
@@ -430,7 +431,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
         pendingEvents.emplace_back(killEvent);
       }
       if (duration != 0) {
-        SequenceEvent* noteEvent = currentInstrument->makeEvent(1 /* volume */, note + tuning, event.value, duration);
+        SequenceEvent* noteEvent = currentInstrument->makeEvent(volume, note + tuning, event.value, duration);
         if (noteEvent) {
           noteEvent->timestamp = playTime;
           double noteReleaseTime = duration >= 0 ? playTime + duration : 0;

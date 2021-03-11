@@ -60,6 +60,7 @@ protected:
   double releaseTime;
   uint8_t transpose;
   double tuning;
+  double volume;
   bool stopped : 1;
 };
 

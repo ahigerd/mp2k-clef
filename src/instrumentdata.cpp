@@ -125,9 +125,6 @@ MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
 
 SequenceEvent* MpInstrument::addEnvelope(SequenceEvent* event, double factor) const
 {
-  if (type & 0x7 == 0) {
-    factor = 1.0;
-  }
   BaseNoteEvent* note = dynamic_cast<BaseNoteEvent*>(event);
   if (note) {
     note->useEnvelope = true;
@@ -216,8 +213,8 @@ SequenceEvent* SampleInstrument::makeEvent(double volume, uint8_t key, uint8_t v
   event->pitchBend = freq / cFreq;
   event->sampleID = sample->sampleID;
   // TODO: velocity accuracy
-  event->volume = volume * (vel / 127.0);
-  return addEnvelope(event, volume);
+  event->volume = (vel / 127.0);
+  return addEnvelope(event, 1.0);
 }
 
 PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
@@ -255,7 +252,7 @@ SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel,
   }
   */
   // TODO: velocity accuracy
-  event->volume = volume * (vel / 127.0) * 0.1;
+  event->volume = (vel / 127.0) * .3;
   return addEnvelope(event, volume);
 }
 

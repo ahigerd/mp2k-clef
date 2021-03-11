@@ -23,7 +23,8 @@ int main(int argc, char** argv)
   }
   std::cout << "Read " << argv[1] << ": " << rom.rom.size() << " bytes." << std::endl;
   if (argc > 2) {
-    SynthContext ctx(42048);
+    //SynthContext ctx(42048);
+    SynthContext ctx(32768);
     SongTable st(rom.findSongTable(-1));
     std::string tag(argv[2]);
     std::unique_ptr<SongData> sd;
