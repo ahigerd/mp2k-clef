@@ -259,8 +259,12 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
           continue;
         }
         repeatCount--;
-        pos = repeatCount > 0 ? repeatAddr : returnAddr;
-        returnAddr = 0;
+        if (repeatCount > 0) {
+          pos = repeatAddr;
+        } else {
+          pos = returnAddr;
+          returnAddr = 0;
+        }
         break;
       case REPT:
         if (returnAddr) {
