@@ -6,6 +6,8 @@
 class ROMFile;
 class SongData;
 
+using std::size_t;
+
 class SongTable {
 public:
   SongTable(const ROMFile* rom);
