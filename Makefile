@@ -8,7 +8,7 @@ all: cli plugins
 
 plugins: audacious
 
-includes: $(wildcard seq2wav/src/*.h seq2wav/src/*/*.h)
+includes: seq2wav/src $(wildcard seq2wav/src/*.h seq2wav/src/*/*.h)
 	$(MAKE) -C seq2wav includes
 
 audacious: aud_$(PLUGIN_NAME).$(DLL)
