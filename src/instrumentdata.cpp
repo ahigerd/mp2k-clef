@@ -1,6 +1,7 @@
 #include "instrumentdata.h"
 #include "romfile.h"
 #include "utility.h"
+#include "s2wcontext.h"
 #include "codec/sampledata.h"
 #include "codec/pcmcodec.h"
 #include "seq/sequenceevent.h"
@@ -157,7 +158,7 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
   uint32_t sampleAddr = rom->readPointer(addr + 4);
   uint32_t sampleStart = sampleAddr;
   uint64_t sampleID = (uint64_t(type) << 32) | sampleAddr;
-  sample = SampleData::get(sampleID);
+  sample = rom->context()->getSample(sampleID);
   if (!sample) {
     int sampleBits = 4;
     int sampleLen = 16;
@@ -175,7 +176,7 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
       }
       sampleBits = 8;
       sampleLen = rom->read<uint32_t>(sampleAddr + 12);
-      if (rom->read<uint32_t>(sampleAddr)) {
+      if (rom->read<uint16_t>(sampleAddr + 2)) {
         loopStart = rom->read<uint32_t>(sampleAddr + 8);
         loopEnd = sampleLen;
       } else {
@@ -189,7 +190,7 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     if (sampleStart + sampleLen > rom->rom.size()) {
       throw ROMFile::BadAccess(sampleStart + sampleLen);
     }
-    sample = PcmCodec(type == GBSample ? 4 : 8).decodeRange(rom->rom.begin() + sampleStart, rom->rom.begin() + sampleStart + sampleLen, sampleID);
+    sample = PcmCodec(rom->context(), type == GBSample ? 4 : 8).decodeRange(rom->rom.begin() + sampleStart, rom->rom.begin() + sampleStart + sampleLen, sampleID);
     sample->sampleRate = sampleRate;
     sample->loopStart = loopStart;
     sample->loopEnd = loopEnd;
@@ -296,7 +297,7 @@ InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
     if (inst) {
       instruments.emplace_back(inst);
     } else {
-      std::cout << "unknown/bad" << std::endl;
+      std::cout << "unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
       instruments.emplace_back(nullptr);
     }
     addr += 12;

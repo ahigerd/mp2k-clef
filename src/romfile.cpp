@@ -17,8 +17,8 @@ ROMFile::BadAccess::BadAccess(uint32_t addr)
   // initializers only
 }
 
-ROMFile::ROMFile()
-: sampleRate(13379)
+ROMFile::ROMFile(S2WContext* ctx)
+: sampleRate(13379), ctx(ctx)
 {
   // initializers only
 }
@@ -46,6 +46,7 @@ SongTable ROMFile::findSongTable(int minSongs, uint32_t offset) const
   uint32_t tableStart = 0;
   std::vector<uint32_t> songs;
   offset -= 4;
+  int badCount = 0;
   while ((offset += 4) < size) {
     uint32_t addr = cleanDeref(offset | 0x08000000, 12);
     if (addr != BAD_PTR && !checkSong(addr, false)) {
@@ -58,10 +59,10 @@ SongTable ROMFile::findSongTable(int minSongs, uint32_t offset) const
           result.tableEnd = offset;
           result.songs = songs;
           if (minSongs > 0 && result.songs.size() > minSongs) {
-            return result;
+            //return result;
           }
         }
-        songs.clear();
+        //songs.clear();
       }
       tableStart = 0;
       continue;

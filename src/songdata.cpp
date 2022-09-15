@@ -472,7 +472,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
 }
 
 SongData::SongData(const ROMFile* rom, uint32_t addr)
-: rom(rom), addr(addr), hasLoop(false), instruments(rom, rom->readPointer(addr + 4))
+: BaseSequence(rom->context()), rom(rom), addr(addr), hasLoop(false), instruments(rom, rom->readPointer(addr + 4))
 {
   int numTracks = rom->read<uint8_t>(addr);
   MpInstrument* defaultInst = nullptr;
@@ -495,5 +495,12 @@ bool SongData::canLoop() const
 
 MpInstrument* SongData::getInstrument(uint8_t id) const
 {
+  if (id >= instruments.instruments.size()) {
+    MpInstrument* defaultInst = nullptr;
+    for (int i = 0; !defaultInst && i < instruments.instruments.size(); i++) {
+      defaultInst = getInstrument(i);
+    }
+    return defaultInst;
+  }
   return instruments.instruments.at(id).get();
 }

@@ -5,6 +5,7 @@
 #include <vector>
 #include <stdexcept>
 #include "utility.h"
+class S2WContext;
 class SongTable;
 
 class ROMFile {
@@ -18,11 +19,13 @@ public:
     const uint32_t addr;
   };
 
-  ROMFile();
+  ROMFile(S2WContext* ctx);
   ROMFile(const ROMFile& other) = delete;
   ROMFile(ROMFile&& other) = delete;
   ROMFile& operator=(const ROMFile& other) = delete;
   ROMFile& operator=(ROMFile&& other) = delete;
+
+  inline S2WContext* context() const { return ctx; }
 
   SongTable findSongTable(int minSongs = -1, uint32_t offset = 0x200) const;
   SongTable findAllSongs() const;
@@ -51,6 +54,8 @@ public:
 private:
   uint32_t cleanPointer(uint32_t addr, uint32_t size = 4, bool align = true) const;
   uint32_t cleanDeref(uint32_t addr, uint32_t size = 4, bool align = true, bool alignPointer = true) const;
+
+  S2WContext* ctx;
 };
 
 #endif

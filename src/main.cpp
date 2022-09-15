@@ -3,6 +3,7 @@
 #include "songdata.h"
 #include "instrumentdata.h"
 #include "utility.h"
+#include "s2wcontext.h"
 #include "synth/synthcontext.h"
 #include "riffwriter.h"
 #include <iostream>
@@ -14,7 +15,8 @@
 int main(int argc, char** argv)
 {
   if (argc < 2) return 1;
-  ROMFile rom;
+  S2WContext s2w;
+  ROMFile rom(&s2w);
   uint8_t buffer[1024];
   std::ifstream f(argv[1]);
   while (f) {
@@ -23,8 +25,8 @@ int main(int argc, char** argv)
   }
   std::cout << "Read " << argv[1] << ": " << rom.rom.size() << " bytes." << std::endl;
   if (argc > 2) {
-    //SynthContext ctx(42048);
-    SynthContext ctx(32768);
+    //SynthContext ctx(&s2w, 42048);
+    SynthContext ctx(&s2w, 32768);
     SongTable st(rom.findSongTable(-1));
     std::string tag(argv[2]);
     std::unique_ptr<SongData> sd;
@@ -75,14 +77,16 @@ int main(int argc, char** argv)
   //  song = rom.readPointer(ptr | 0x08000000, false);
   for (uint32_t song : st.songs) {
     std::cout << std::dec << "(" << i << ") " << std::hex << /*ptr <<*/ " -> " << song << std::endl;
-    if (rom.checkSong(song)) {
-      std::cout << "\t(" << std::dec << i << ") " << std::hex << song << std::dec << ": " << int(rom.rom[song]) << " " << (rom.checkSong(song) ? "+" : "-") << std::endl;
-    }
-    ++i;
     try {
+      if (rom.checkSong(song)) {
+        std::cout << "\t(" << std::dec << i << ") " << std::hex << song << std::dec << ": " << int(rom.rom[song]) << " " << (rom.checkSong(song) ? "+" : "-") << std::endl;
+      }
+      ++i;
       st.songAt(song);
     } catch (std::runtime_error& e) {
       std::cout << "\t\t" << e.what() << std::endl;
+    } catch (...) {
+      std::cout << "\t\tunknown error" << std::endl;
     }
   }
 
