@@ -8,6 +8,14 @@
 class ROMFile;
 class SongData;
 
+struct RawEvent {
+  uint32_t addr;
+  uint8_t opcode;
+  std::vector<uint32_t> args;
+
+  std::string render() const;
+};
+
 struct Mp2kEvent {
   enum Type {
     Note,
@@ -44,6 +52,8 @@ public:
   const uint32_t addr;
   bool hasLoop;
 
+  void showParsed(std::ostream& out);
+
 protected:
   virtual std::shared_ptr<SequenceEvent> readNextEvent();
   virtual void internalReset();
@@ -53,6 +63,7 @@ protected:
   double secPerTick;
   double lengthCache;
   MpInstrument* currentInstrument;
+  std::vector<RawEvent> rawEvents;
   std::vector<Mp2kEvent> events;
   std::vector<std::shared_ptr<SequenceEvent>> pendingEvents;
   std::unordered_map<uint8_t, ActiveNote> activeNotes;
@@ -78,6 +89,8 @@ public:
   const ROMFile* const rom;
   const uint32_t addr;
   InstrumentData instruments;
+
+  void showParsed(std::ostream& out);
 
   std::vector<std::pair<double, double>> tempos;
   std::unordered_map<uint8_t, TrackData::ActiveNote> activePsg;

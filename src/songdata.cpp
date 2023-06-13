@@ -81,43 +81,37 @@ namespace EventType {
   }
 }
 
-struct RawEvent {
-  uint32_t addr;
-  uint8_t opcode;
-  std::vector<uint32_t> args;
-
-  std::string render() const {
-    std::ostringstream ss;
-    ss << "0x" << std::hex << addr << " " << std::dec;
-    if (opcode < 0x80) {
-      ss << "      ";
-    } else {
-      ss << std::setw(6) << EventType::name(opcode);
-    }
-    bool first = true;
-    if (opcode >= 0x80 && opcode <= 0xB0) {
-      ss << " " << (opcode - 0x80);
-      first = false;
-    } else if (opcode >= 0xD0) {
-      ss << " " << (opcode - 0xCF);
-      first = false;
-    }
-    for (uint32_t arg : args) {
-      if (first) {
-        first = false;
-        ss << " ";
-      } else {
-        ss << ", ";
-      }
-      if (arg > 0xFF) {
-        ss << std::hex << "0x" << arg << std::dec;
-      } else {
-        ss << arg;
-      }
-    }
-    return ss.str();
+std::string RawEvent::render() const {
+  std::ostringstream ss;
+  ss << "0x" << std::hex << addr << " " << std::dec;
+  if (opcode < 0x80) {
+    ss << "      ";
+  } else {
+    ss << std::setw(6) << EventType::name(opcode);
   }
-};
+  bool first = true;
+  if (opcode >= 0x80 && opcode <= 0xB0) {
+    ss << " " << (opcode - 0x80);
+    first = false;
+  } else if (opcode >= 0xD0) {
+    ss << " " << (opcode - 0xCF);
+    first = false;
+  }
+  for (uint32_t arg : args) {
+    if (first) {
+      first = false;
+      ss << " ";
+    } else {
+      ss << ", ";
+    }
+    if (arg > 0xFF) {
+      ss << std::hex << "0x" << arg << std::dec;
+    } else {
+      ss << arg;
+    }
+  }
+  return ss.str();
+}
 
 TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* defaultInst)
 : trackIndex(index), song(song), addr(addr), hasLoop(true), playIndex(0), playTime(0), secPerTick(1.0 / 75.0),
@@ -191,7 +185,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
         raw.args.push_back(r[pos + i]);
       }
     }
-    std::cout << "[" << trackIndex << "] " << std::setw(6) << ts << " | " << raw.render() << std::endl;
+    rawEvents.push_back(raw);
     pos += eventSize;
     Mp2kEvent ev;
     ev.effAddr = (uint64_t(returnAddr) << 32) | raw.addr;
@@ -306,10 +300,10 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
       case 0xCC: // Unknown
         // ???
         //break;
-        std::cout << "unknown " << (int)raw.opcode << std::endl;
+        //std::cerr << "unknown " << (int)raw.opcode << std::endl;
         break;
       default:
-        std::cout << "XXX " << std::hex << (int)raw.opcode << std::endl;
+        //std::cerr << "XXX " << std::hex << (int)raw.opcode << std::endl;
         throw std::runtime_error("unknown MP2K command");
     }
   }
@@ -361,10 +355,10 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
       if (didGoto) {
         // loop never produces an event: abort
         playIndex = events.size();
-        std::cout << "abort" << std::endl;
+        //std::cerr << "abort" << std::endl;
       } else {
         playIndex = event.value;
-        std::cout << "goto" << std::endl;
+        //std::cerr << "goto" << std::endl;
         didGoto = true;
       }
     } else if (event.type == Mp2kEvent::Param) {
@@ -383,7 +377,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           break;
         case VOICE:
           currentInstrument = song->getInstrument(event.value);
-          std::cout << trackIndex << ": Using instrument " << std::dec << (int)event.value << " (" << (currentInstrument ? (int)currentInstrument->type : -1) << ") " << std::endl;
+          std::cerr << trackIndex << ": Using instrument " << std::dec << (int)event.value << " (" << (currentInstrument ? (int)currentInstrument->type : -1) << ") " << std::endl;
           if (currentInstrument) {
             releaseTime = currentInstrument->release;
           }
@@ -412,7 +406,8 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           break;
         default:
           // TODO
-          std::cout << "unknown param " << std::hex << (int)event.param << std::dec << std::endl;
+          std::cerr << "unknown param " << std::hex << (int)event.param << std::dec << std::endl;
+          break;
       }
     } else if (event.type == Mp2kEvent::Note && currentInstrument) {
       uint8_t note = event.param + transpose;
@@ -471,6 +466,14 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
   return nullptr;
 }
 
+void TrackData::showParsed(std::ostream& out)
+{
+  out << "Track " << trackIndex << ":" << std::endl;
+  for (const RawEvent& raw : rawEvents) {
+    out << "\t" << raw.render() << std::endl;
+  }
+}
+
 SongData::SongData(const ROMFile* rom, uint32_t addr)
 : BaseSequence(rom->context()), rom(rom), addr(addr), hasLoop(false), instruments(rom, rom->readPointer(addr + 4))
 {
@@ -503,4 +506,12 @@ MpInstrument* SongData::getInstrument(uint8_t id) const
     return defaultInst;
   }
   return instruments.instruments.at(id).get();
+}
+
+void SongData::showParsed(std::ostream& out)
+{
+  for (const auto& track : tracks) {
+    TrackData* td = static_cast<TrackData*>(track.get());
+    td->showParsed(out);
+  }
 }

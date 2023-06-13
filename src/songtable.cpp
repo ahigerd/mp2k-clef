@@ -2,6 +2,12 @@
 #include "songdata.h"
 #include "romfile.h"
 
+SongTable::SongTable()
+: rom(nullptr), tableStart(0), tableEnd(0)
+{
+  // initializers only
+}
+
 SongTable::SongTable(const ROMFile* rom)
 : rom(rom), tableStart(0), tableEnd(0)
 {

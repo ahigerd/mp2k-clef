@@ -5,6 +5,7 @@
 #include "codec/sampledata.h"
 #include "codec/pcmcodec.h"
 #include "seq/sequenceevent.h"
+#include "synth/oscillator.h"
 #include "riffwriter.h"
 #include <sstream>
 #include <cmath>
@@ -80,13 +81,15 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
   uint8_t normType = type & 0x7 ? type & 0x7 : type;
   try {
     switch (normType) {
-      case Sample:
       case GBSample:
+        return nullptr;
+      case Sample:
       case FixedSample:
         return new SampleInstrument(rom, addr);
       case Square1:
       case Square2:
       case Noise:
+        return nullptr;
         return new PSGInstrument(rom, addr);
       case KeySplit:
       case Percussion:
@@ -94,7 +97,7 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
           return new SplitInstrument(rom, addr);
         }
       default:
-        std::cout << "???? " << std::hex << addr << " " << std::dec << (int)type << std::endl;
+        //std::cerr << "0x" << std::hex << addr << ": Unknown instrument type " << std::dec << (int)type << std::endl;
         return nullptr;
     }
   } catch (ROMFile::BadAccess& e) {
@@ -234,18 +237,18 @@ SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel,
   event->frequency = noteToFreq(key);
   if (type == Noise) {
     if (mode & 1) {
-      event->waveformID = 5;
+      event->waveformID = BaseOscillator::GBNoise127;
     } else {
-      event->waveformID = 5;
+      event->waveformID = BaseOscillator::GBNoise;
     }
   } else if (mode == 0) {
-    event->waveformID = 3;
+    event->waveformID = BaseOscillator::Square125;
   } else if (mode == 1) {
-    event->waveformID = 2;
+    event->waveformID = BaseOscillator::Square25;
   } else if (mode == 2) {
-    event->waveformID = 0;
+    event->waveformID = BaseOscillator::Square50;
   } else if (mode == 3) {
-    event->waveformID = 1;
+    event->waveformID = BaseOscillator::Square75;
   }
   /*
   if (sweep) {
@@ -297,7 +300,7 @@ InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
     if (inst) {
       instruments.emplace_back(inst);
     } else {
-      std::cout << "unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
+      //std::cout << "unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
       instruments.emplace_back(nullptr);
     }
     addr += 12;

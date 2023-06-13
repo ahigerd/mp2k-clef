@@ -1,3 +1,4 @@
+ROOTPATH := ../
 include ../config.mak
 
 SOURCES = $(wildcard *.cpp */*.cpp)
@@ -8,8 +9,16 @@ OBJS_D = $(patsubst %.cpp, ../$(BUILDPATH)/%_d.o, $(SOURCES))
 	$(CXX) -o $@ $(OBJS_R) $(LDFLAGS_R)
 	strip $@
 
-../$(PLUGIN_NAME)_d$(EXE): ../seq2wav/$(BUILDPATH)/libseq2wav_d.$(DLL) $(OBJS_D)
+../$(PLUGIN_NAME)_d$(EXE): ../seq2wav/$(BUILDPATH)/libseq2wav_d.a $(OBJS_D)
 	$(CXX) -o $@ $(OBJS_D) $(LDFLAGS_D)
+
+../$(BUILDPATH)/lib$(PLUGIN_NAME).a: ../seq2wav/$(BUILDPATH)/libseq2wav.a $(OBJS_R)
+	rm -f $@
+	gcc-ar -rc $@ $(OBJS_R)
+
+../$(BUILDPATH)/lib$(PLUGIN_NAME)_d.a: ../seq2wav/$(BUILDPATH)/libseq2wav_d.a $(OBJS_D)
+	rm -f $@
+	gcc-ar -rc $@ $(OBJS_D)
 
 ../$(BUILDPATH)/%.o: %.cpp Makefile ../config.mak
 	@mkdir -p $(dir $@)

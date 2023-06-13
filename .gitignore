@@ -30,3 +30,9 @@ include
 plugins/foobar2000
 plugins/pfc
 plugins/libPPUI
+
+# game files
+*.gba
+*.cheats
+*.sav
+*.ss*

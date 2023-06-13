@@ -6,89 +6,196 @@
 #include "s2wcontext.h"
 #include "synth/synthcontext.h"
 #include "riffwriter.h"
+#include "commandargs.h"
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <memory>
+#include <algorithm>
 #include <cstdlib>
 #include <sstream>
 
-int main(int argc, char** argv)
+static int scanSongTables(const std::string& path, bool doValidate)
 {
-  if (argc < 2) return 1;
   S2WContext s2w;
   ROMFile rom(&s2w);
-  uint8_t buffer[1024];
-  std::ifstream f(argv[1]);
-  while (f) {
-    f.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
-    rom.rom.insert(rom.rom.end(), buffer, buffer + f.gcount());
-  }
-  std::cout << "Read " << argv[1] << ": " << rom.rom.size() << " bytes." << std::endl;
-  if (argc > 2) {
-    //SynthContext ctx(&s2w, 42048);
-    SynthContext ctx(&s2w, 32768);
-    SongTable st(rom.findSongTable(-1));
-    std::string tag(argv[2]);
-    std::unique_ptr<SongData> sd;
-    uint32_t index = ~0;
-    if (tag.size() > 2 && tag[1] == 'x') {
-      uint32_t addr = std::strtol(argv[2] + 2, nullptr, 16);
-      sd.reset(st.songAt(addr));
-    } else {
-      index = std::atoi(argv[2]);
-      sd.reset(st.songFromTable(index));
-    }
-    bool ok = rom.checkSong(sd->addr, true);
-    if (!ok) {
-      std::cout << "Check failed." << std::endl;
-      return 1;
-    }
-    std::cout << "Validated." << std::endl;
-    if (index == ~0) {
-      std::cout << "Song @";
-    } else {
-      std::cout << "Song #" << index << ":";
-    }
-    std::cout << " 0x" << std::hex << sd->addr << std::endl;
-    std::cout << std::dec << "\tTracks: " << sd->numTracks() << std::endl;
-    for (int i = 0; i < sd->numTracks(); i++) {
-      ctx.addChannel(sd->getTrack(i));
-    }
+  rom.load(path);
 
-    std::ostringstream fnss;
-    fnss << argv[1] << "." << argv[2] << ".wav";
-    std::string filename = fnss.str();
-    std::cerr << "Writing " << (int(ctx.maximumTime() * 10) * .1) << " seconds to \"" << filename << "\"..." << std::endl;
-    RiffWriter riff(ctx.sampleRate, true);
-    riff.open(filename);
-    ctx.save(&riff);
-    riff.close();
+  std::vector<SongTable> sts = rom.findSongTables();
+  if (sts.empty()) {
+    std::cerr << "No song tables found." << std::endl;
+    return 1;
+  }
+
+  for (const auto& st : rom.findSongTables()) {
+    std::cerr << "Song table @ 0x" << std::hex << st.tableStart << std::dec << ": " << st.songs.size() << " songs (table size " << ((st.tableEnd - st.tableStart) / 8) << ")" << std::endl;
+    for (uint32_t addr = st.tableStart; addr < st.tableEnd; addr += 8) {
+      uint32_t song = rom.readPointer(addr);
+      if (!doValidate && std::find(st.songs.begin(), st.songs.end(), song) == st.songs.end()) {
+        continue;
+      }
+      int idx = (addr - st.tableStart) / 8;
+      std::cerr << "\t" << std::setfill(' ') << std::setw(4) << idx << " Song @ 0x" << std::hex << std::setw(8) << std::setfill('0') << song << std::dec << " - ";
+      try {
+        std::unique_ptr<SongData> sd(st.songAt(song));
+        std::cerr << sd->numTracks() << " tracks" << std::endl;
+      } catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+      } catch (...) {
+        std::cerr << "unknown error" << std::endl;
+      }
+    }
+  }
+  return 0;
+}
+
+static int scanAllSongs(const std::string& path)
+{
+  S2WContext s2w;
+  ROMFile rom(&s2w);
+  rom.load(path);
+
+  SongTable st = rom.findAllSongs();
+  if (st.songs.empty()) {
+    std::cerr << "No songs found." << std::endl;
+    return 1;
+  }
+
+  for (uint32_t song : st.songs) {
+    std::unique_ptr<SongData> sd(st.songAt(song));
+    std::cerr << "Song @ 0x" << std::hex << song << std::dec << " - " << sd->numTracks() << " tracks" << std::endl;
+    std::cerr << std::endl;
+  }
+  return 0;
+}
+
+int main(int argc, char** argv)
+{
+  CommandArgs args({
+    { "help", "h", "", "Show this help text" },
+    { "output", "o", "filename", "Specify the output filename" },
+    { "scan", "s", "", "Scan for song tables" },
+    { "scan-songs", "S", "", "Scan for songs, even without tables" },
+    { "validate", "V", "", "Validate songs when scanning" },
+    { "table", "t", "location", "Use a specific song table" },
+    { "parse", "p", "", "Output parsed sequence data instead of audio" },
+    { "", "", "input", "Path to the input file" },
+    { "", "", "song", "Song index or sequence offset" },
+  });
+
+  std::string argError = args.parse(argc, argv);
+  if (!argError.empty()) {
+    std::cerr << argError << std::endl;
+    return 1;
+  }
+
+  if (args.hasKey("help") || args.positional().empty()) {
+    std::cerr << args.usageText(argv[0]) << std::endl;
     return 0;
   }
-  //SongTable st(rom.findSongTable(-1));
-  SongTable st(rom.findAllSongs());
-  std::cout << "Song table: " << st.songs.size() << std::endl;
-  int i = 0;
-  //for (uint32_t song : st.songs) {
-  uint32_t song;
-  //std::cout << "..." << std::dec << ((st.tableEnd - st.tableStart) / 8) << std::endl;
-  //for (uint32_t song : st.songs) std::cout << song << std::endl;
-  //for (uint32_t ptr = st.tableStart; ptr < st.tableEnd; ptr += 8, i++) {
-  //  song = rom.readPointer(ptr | 0x08000000, false);
-  for (uint32_t song : st.songs) {
-    std::cout << std::dec << "(" << i << ") " << std::hex << /*ptr <<*/ " -> " << song << std::endl;
-    try {
-      if (rom.checkSong(song)) {
-        std::cout << "\t(" << std::dec << i << ") " << std::hex << song << std::dec << ": " << int(rom.rom[song]) << " " << (rom.checkSong(song) ? "+" : "-") << std::endl;
+
+  std::string src = args.positional()[0];
+
+  if (args.hasKey("scan")) {
+    return scanSongTables(src, args.hasKey("validate"));
+  }
+
+  if (args.hasKey("scan-songs")) {
+    return scanAllSongs(src);
+  }
+
+  if (args.positional().size() < 2) {
+    std::cerr << args.usageText(argv[0]) << std::endl;
+    return 1;
+  }
+
+  S2WContext s2w;
+  ROMFile rom(&s2w);
+  rom.load(src);
+
+  std::string songSelection = args.positional()[1];
+
+  SongTable songTable;
+  bool byAddr = songSelection.substr(0, 2) == "0x";
+  if (args.hasKey("table")) {
+    std::string tbl(args.getString("table"));
+    uint32_t songTableAddr = 0;
+    if (tbl.size() > 2 && tbl[1] == 'x') {
+      songTableAddr = args.getInt("table");
+      songTable = rom.findSongTable(1, songTableAddr);
+      if (songTable.songs.empty()) {
+        std::cerr << "Song table " << args.getInt("table") << " not found" << std::endl;
+        return 1;
       }
-      ++i;
-      st.songAt(song);
-    } catch (std::runtime_error& e) {
-      std::cout << "\t\t" << e.what() << std::endl;
-    } catch (...) {
-      std::cout << "\t\tunknown error" << std::endl;
+    } else {
+      int songTableIdx = args.getInt("table");
+      do {
+        songTable = rom.findSongTable(1, songTableAddr);
+        if (songTable.songs.empty()) {
+          std::cerr << "Song table " << args.getInt("table") << " not found" << std::endl;
+          return 1;
+        }
+        songTableIdx--;
+        songTableAddr = songTable.tableEnd;
+      } while (songTableIdx > 0);
+    }
+  } else if (byAddr) {
+    songTable = rom.findAllSongs();
+  } else {
+    songTable = rom.findSongTable(-1);
+    if (songTable.songs.empty()) {
+      std::cerr << "No song table found" << std::endl;
+      return 1;
     }
   }
 
+  std::unique_ptr<SongData> sd;
+  try {
+    if (byAddr) {
+      uint32_t addr = 0;
+      addr = std::stoi(songSelection, nullptr, 16);
+      sd.reset(songTable.songAt(addr));
+    } else {
+      uint32_t index = ~0;
+      index = std::stoi(songSelection);
+      sd.reset(songTable.songFromTable(index));
+    }
+    if (!sd) {
+      std::cerr << "Could not load song " << songSelection << std::endl;
+      return 1;
+    }
+  } catch (std::exception& e) {
+    std::cerr << "An error occurred while loading song " << songSelection << std::endl;
+    std::cerr << "\t" << e.what() << std::endl;
+    return 1;
+  }
+
+  SynthContext ctx(&s2w, 32768);
+
+  std::string filename = args.getString("output");
+  if (args.hasKey("parse")) {
+    if (filename.empty()) {
+      sd->showParsed(std::cout);
+    } else {
+      std::ofstream out(filename);
+      sd->showParsed(out);
+    }
+    return 0;
+  }
+
+  for (int i = 0; i < sd->numTracks(); i++) {
+    ctx.addChannel(sd->getTrack(i));
+  }
+
+  if (filename.empty()) {
+    std::ostringstream fnss;
+    fnss << src << "." << songSelection << ".wav";
+    filename = fnss.str();
+  }
+  std::cerr << "Writing " << (int(ctx.maximumTime() * 10) * .1) << " seconds to \"" << filename << "\"..." << std::endl;
+  RiffWriter riff(ctx.sampleRate, true);
+  riff.open(filename);
+  ctx.save(&riff);
+  riff.close();
   return 0;
 }

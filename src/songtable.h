@@ -10,10 +10,14 @@ using std::size_t;
 
 class SongTable {
 public:
+  SongTable();
   SongTable(const ROMFile* rom);
+  SongTable(const SongTable& other) = default;
   SongTable(SongTable&& other) = default;
+  SongTable& operator=(const SongTable& other) = default;
+  SongTable& operator=(SongTable&& other) = default;
 
-  const ROMFile* const rom;
+  const ROMFile* rom;
   uint32_t tableStart, tableEnd;
   std::vector<uint32_t> songs;
 

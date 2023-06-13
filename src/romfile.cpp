@@ -2,6 +2,7 @@
 #include "songtable.h"
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 
 std::string ROMFile::BadAccess::message(uint32_t addr)
@@ -21,6 +22,16 @@ ROMFile::ROMFile(S2WContext* ctx)
 : sampleRate(13379), ctx(ctx)
 {
   // initializers only
+}
+
+void ROMFile::load(const std::string& path)
+{
+  uint8_t buffer[1024];
+  std::ifstream f(path);
+  while (f) {
+    f.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
+    rom.insert(rom.end(), buffer, buffer + f.gcount());
+  }
 }
 
 uint32_t ROMFile::cleanPointer(uint32_t addr, uint32_t size, bool align) const
@@ -58,8 +69,8 @@ SongTable ROMFile::findSongTable(int minSongs, uint32_t offset) const
           result.tableStart = tableStart;
           result.tableEnd = offset;
           result.songs = songs;
-          if (minSongs > 0 && result.songs.size() > minSongs) {
-            //return result;
+          if (minSongs >= 0 && result.songs.size() > minSongs) {
+            return result;
           }
         }
         //songs.clear();
@@ -82,6 +93,22 @@ SongTable ROMFile::findSongTable(int minSongs, uint32_t offset) const
     result.songs = songs;
   }
   return result;
+}
+
+std::vector<SongTable> ROMFile::findSongTables(uint32_t offset) const
+{
+  std::vector<SongTable> tables;
+  size_t size = rom.size() - 8;
+  while (offset < size) {
+    SongTable table = findSongTable(0, offset);
+    if (!table.songs.size()) {
+      // Didn't find (another) song table
+      break;
+    }
+    tables.push_back(table);
+    offset = table.tableEnd;
+  }
+  return tables;
 }
 
 SongTable ROMFile::findAllSongs() const

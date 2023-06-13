@@ -25,9 +25,12 @@ public:
   ROMFile& operator=(const ROMFile& other) = delete;
   ROMFile& operator=(ROMFile&& other) = delete;
 
+  void load(const std::string& path);
+
   inline S2WContext* context() const { return ctx; }
 
   SongTable findSongTable(int minSongs = -1, uint32_t offset = 0x200) const;
+  std::vector<SongTable> findSongTables(uint32_t offset = 0x200) const;
   SongTable findAllSongs() const;
   bool checkSong(uint32_t addr, bool deep = true) const;
 
@@ -36,19 +39,19 @@ public:
 
   inline uint8_t operator[](uint32_t addr) const { return read<uint8_t>(addr); }
   template<typename T> inline T read(uint32_t addr) const {
-    addr = cleanPointer(addr | 0x08000000, sizeof(T), false);
-    if (addr == BAD_PTR) throw BadAccess(addr);
-    return parseInt<T>(rom, addr);
+    uint32_t cleaned = cleanPointer(addr | 0x08000000, sizeof(T), false);
+    if (cleaned == BAD_PTR) throw BadAccess(addr);
+    return parseInt<T>(rom, cleaned);
   }
   inline uint32_t readPointer(uint32_t addr, bool align = true) const {
-    addr = cleanDeref(addr, 4, align, false);
-    if (addr == BAD_PTR) throw BadAccess(addr);
-    return addr;
+    uint32_t cleaned = cleanDeref(addr, 4, align, false);
+    if (cleaned == BAD_PTR) throw BadAccess(addr);
+    return cleaned;
   }
   template<typename T> inline T deref(uint32_t addr) const {
-    addr = cleanDeref(addr, sizeof(T), (sizeof(T) & 3) > 0);
-    if (addr == BAD_PTR) throw BadAccess(addr);
-    return parseInt<T>(rom, addr);
+    uint32_t cleaned = cleanDeref(addr, sizeof(T), (sizeof(T) & 3) > 0);
+    if (cleaned == BAD_PTR) throw BadAccess(addr);
+    return parseInt<T>(rom, cleaned);
   }
 
 private:
