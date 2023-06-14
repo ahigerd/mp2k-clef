@@ -335,6 +335,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
 {
   bool didGoto = false;
   while (!isFinished() && !pendingEvents.size()) {
+    std::cerr << trackIndex << ":" << playIndex << "@" << playTime << "\t" << rawEvents[playIndex].render() << std::endl;
     const Mp2kEvent& event = events[playIndex++];
     for (int i = song->tempos.size() - 1; i >= 0; --i) {
       const auto& tempo = song->tempos[i];

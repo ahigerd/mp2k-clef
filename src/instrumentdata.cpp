@@ -82,14 +82,12 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
   try {
     switch (normType) {
       case GBSample:
-        return nullptr;
       case Sample:
       case FixedSample:
         return new SampleInstrument(rom, addr);
       case Square1:
       case Square2:
       case Noise:
-        return nullptr;
         return new PSGInstrument(rom, addr);
       case KeySplit:
       case Percussion:
@@ -146,7 +144,7 @@ SequenceEvent* MpInstrument::addEnvelope(SequenceEvent* event, double factor) co
       static const double COEF = 64.9707;
       static const double ADJ = 1.4875;
       note->decay = decay ? std::log(decay * factor) * COEF - ADJ : 0;
-      note->release = release ? std::log(release * factor) * COEF - ADJ : 0;
+      note->release = release * factor; //  ? std::log(release * factor) * COEF - ADJ : 0;
     } else {
       note->decay = decay * factor;
       note->release = release * factor;
