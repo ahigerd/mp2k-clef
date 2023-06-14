@@ -1,7 +1,6 @@
 #include "romfile.h"
 #include "songtable.h"
 #include <algorithm>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 
@@ -26,8 +25,13 @@ ROMFile::ROMFile(S2WContext* ctx)
 
 void ROMFile::load(const std::string& path)
 {
-  uint8_t buffer[1024];
   std::ifstream f(path);
+  load(f);
+}
+
+void ROMFile::load(std::istream& f)
+{
+  uint8_t buffer[1024];
   while (f) {
     f.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
     rom.insert(rom.end(), buffer, buffer + f.gcount());

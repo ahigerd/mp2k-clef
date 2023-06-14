@@ -30,5 +30,5 @@ SongData* SongTable::songFromTable(size_t index) const
   if (ptr >= tableEnd) {
     throw std::out_of_range("song index out of range");
   }
-  return songAt(rom->readPointer(tableStart + 8 * index));
+  return songAt(rom->readPointer(ptr));
 }

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include <stdexcept>
+#include <iostream>
 #include "utility.h"
 class S2WContext;
 class SongTable;
@@ -26,6 +27,7 @@ public:
   ROMFile& operator=(ROMFile&& other) = delete;
 
   void load(const std::string& path);
+  void load(std::istream& stream);
 
   inline S2WContext* context() const { return ctx; }
 
