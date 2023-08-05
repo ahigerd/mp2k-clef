@@ -15,6 +15,8 @@
 *.lib
 build
 build_win
+*_plugin_import.cpp
+core
 
 # build outputs
 depends.mak
@@ -25,6 +27,10 @@ include
 *.a
 *.so
 *.exe
+*_gui
+*_gui_d
+*.clap
+gui/Makefile*
 
 # external dependencies
 plugins/foobar2000

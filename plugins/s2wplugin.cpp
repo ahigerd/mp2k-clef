@@ -7,6 +7,10 @@
 #include <iomanip>
 #include <map>
 
+#ifdef BUILD_CLAP
+#include "plugin/clapplugin.h"
+#endif
+
 // In the functions below, openFile() is provided by the plugin interface. Use this
 // instead of standard library functions to open additional files in order to use
 // the host's virtual filesystem.
@@ -58,6 +62,9 @@ static std::map<std::string, std::vector<std::string>> subsongCache;
 
 struct S2WPluginInfo {
   S2WPLUGIN_STATIC_FIELDS
+#ifdef BUILD_CLAP
+  using ClapPlugin = S2WClapPlugin<S2WPluginInfo>;
+#endif
 
   std::unique_ptr<ROMFile> rom;
   std::unique_ptr<SongData> songData;
