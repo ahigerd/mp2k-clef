@@ -23,14 +23,15 @@ ROMFile::ROMFile(S2WContext* ctx)
   // initializers only
 }
 
-void ROMFile::load(const std::string& path)
+void ROMFile::load(SynthContext* synth, const std::string& path)
 {
   std::ifstream f(path);
-  load(f);
+  load(synth, f);
 }
 
-void ROMFile::load(std::istream& f)
+void ROMFile::load(SynthContext* synth, std::istream& f)
 {
+  this->synth = synth;
   uint8_t buffer[1024];
   while (f) {
     f.read(reinterpret_cast<char*>(buffer), sizeof(buffer));

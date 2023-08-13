@@ -22,11 +22,11 @@ static SynthContext* openBySubsong(S2WContext* ctx, std::unique_ptr<ROMFile>& ro
     synth = new SynthContext(ctx, 32768);
     rom.reset(new ROMFile(ctx));
     if (file) {
-      rom->load(file);
+      rom->load(synth, file);
     } else {
       size_t qpos = filename.rfind('?');
       auto newFile(ctx->openFile(filename.substr(0, qpos)));
-      rom->load(*newFile);
+      rom->load(synth, *newFile);
     }
     std::cerr << "loaded " << rom->rom.size() << " bytes " << filename << std::endl;
 
@@ -116,7 +116,7 @@ struct S2WPluginInfo {
 
     std::vector<std::string> subsongs;
     ROMFile rom(s2w);
-    rom.load(file);
+    rom.load(nullptr, file);
     SongTable st = rom.findAllSongs();
 
     for (uint32_t song : st.songs) {

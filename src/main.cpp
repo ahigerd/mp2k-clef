@@ -19,7 +19,7 @@ static int scanSongTables(const std::string& path, bool doValidate)
 {
   S2WContext s2w;
   ROMFile rom(&s2w);
-  rom.load(path);
+  rom.load(nullptr, path);
 
   std::vector<SongTable> sts = rom.findSongTables();
   if (sts.empty()) {
@@ -53,7 +53,7 @@ static int scanAllSongs(const std::string& path)
 {
   S2WContext s2w;
   ROMFile rom(&s2w);
-  rom.load(path);
+  rom.load(nullptr, path);
 
   SongTable st = rom.findAllSongs();
   if (st.songs.empty()) {
@@ -110,8 +110,9 @@ int main(int argc, char** argv)
   }
 
   S2WContext s2w;
+  SynthContext ctx(&s2w, 32768);
   ROMFile rom(&s2w);
-  rom.load(src);
+  rom.load(&ctx, src);
 
   std::string songSelection = args.positional()[1];
 
@@ -169,8 +170,6 @@ int main(int argc, char** argv)
     std::cerr << "\t" << e.what() << std::endl;
     return 1;
   }
-
-  SynthContext ctx(&s2w, 32768);
 
   std::string filename = args.getString("output");
   if (args.hasKey("parse")) {

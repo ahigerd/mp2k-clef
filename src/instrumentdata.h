@@ -4,11 +4,13 @@
 #include <vector>
 #include <cstdint>
 #include <memory>
+#include "synth/iinstrument.h"
 class ROMFile;
 class SampleData;
-class SequenceEvent;
+struct BaseNoteEvent;
+class SynthContext;
 
-class MpInstrument {
+class MpInstrument: public IInstrument {
 public:
   static MpInstrument* load(const ROMFile* rom, uint32_t addr, bool isSplit = false);
   MpInstrument(const ROMFile* rom, uint32_t addr);
@@ -33,10 +35,11 @@ public:
   bool forcePan;
   uint8_t pan;
   double gate;
-  virtual SequenceEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const = 0;
+  virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const = 0;
+  virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event) = 0;
 
 protected:
-  SequenceEvent* addEnvelope(SequenceEvent* event, double factor) const;
+  Channel::Note* addEnvelope(Channel* channel, Channel::Note* event, double factor) const;
 };
 
 class SampleInstrument : public MpInstrument {
@@ -45,7 +48,8 @@ public:
 
   SampleData* sample;
 
-  virtual SequenceEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
+  virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
+  virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
 };
 
 class PSGInstrument : public MpInstrument {
@@ -54,7 +58,8 @@ public:
 
   uint8_t mode, sweep;
 
-  virtual SequenceEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
+  virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
+  virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
 };
 
 class SplitInstrument : public MpInstrument {
@@ -63,14 +68,15 @@ public:
 
   std::vector<std::shared_ptr<MpInstrument>> splits;
 
-  virtual SequenceEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
+  virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
+  virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
 };
 
 class InstrumentData {
 public:
   InstrumentData(const ROMFile* rom, uint32_t addr);
 
-  std::vector<std::shared_ptr<MpInstrument>> instruments;
+  std::vector<MpInstrument*> instruments;
 };
 
 #endif

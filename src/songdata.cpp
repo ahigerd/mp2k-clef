@@ -377,10 +377,14 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           tuning = (int(event.value) - 64) / 64.0;
           break;
         case VOICE:
-          currentInstrument = song->getInstrument(event.value);
-          std::cerr << trackIndex << ": Using instrument " << std::dec << (int)event.value << " (" << (currentInstrument ? (int)currentInstrument->type : -1) << ") " << std::endl;
-          if (currentInstrument) {
-            releaseTime = currentInstrument->release;
+          {
+            int instID = int(event.value);
+            currentInstrument = song->getInstrument(instID);
+            std::cerr << trackIndex << ": Using instrument " << std::dec << instID << " (" << (currentInstrument ? (int)currentInstrument->type : -1) << ") " << std::endl;
+            if (currentInstrument) {
+              pendingEvents.emplace_back(new ChannelEvent('inst', uint64_t(instID)));
+              releaseTime = currentInstrument->release;
+            }
           }
           break;
         case PAN:
@@ -431,13 +435,13 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
         pendingEvents.emplace_back(killEvent);
       }
       if (duration != 0) {
-        SequenceEvent* noteEvent = currentInstrument->makeEvent(volume, note + tuning, event.value, duration);
+        BaseNoteEvent* noteEvent = currentInstrument->makeEvent(volume, note + tuning, event.value, duration);
         if (noteEvent) {
           noteEvent->timestamp = playTime;
           double noteReleaseTime = duration >= 0 ? playTime + duration : 0;
           double endTime = noteReleaseTime + releaseTime;
           active[noteID] = (ActiveNote){
-            dynamic_cast<BaseNoteEvent*>(noteEvent)->playbackID,
+            noteEvent->playbackID,
             noteReleaseTime,
             endTime,
             false,
@@ -506,7 +510,7 @@ MpInstrument* SongData::getInstrument(uint8_t id) const
     }
     return defaultInst;
   }
-  return instruments.instruments.at(id).get();
+  return instruments.instruments.at(id);
 }
 
 void SongData::showParsed(std::ostream& out)

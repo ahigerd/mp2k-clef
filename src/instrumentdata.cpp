@@ -5,7 +5,9 @@
 #include "codec/sampledata.h"
 #include "codec/pcmcodec.h"
 #include "seq/sequenceevent.h"
+#include "synth/synthcontext.h"
 #include "synth/oscillator.h"
+#include "synth/sampler.h"
 #include "riffwriter.h"
 #include <sstream>
 #include <cmath>
@@ -125,32 +127,33 @@ MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
   }
 }
 
-SequenceEvent* MpInstrument::addEnvelope(SequenceEvent* event, double factor) const
+Channel::Note* MpInstrument::addEnvelope(Channel* channel, Channel::Note* note, double factor) const
 {
-  BaseNoteEvent* note = dynamic_cast<BaseNoteEvent*>(event);
-  if (note) {
-    note->useEnvelope = true;
-    if (attack) {
-      note->startGain = 1.0 - (60 * attack) / 255;
-      note->attack = attack * factor;
-    } else {
-      note->startGain = 1.0;
-      note->attack = 0;
-    }
-    note->sustain = sustain;
-    note->expDecay = (type & 0x7) == 0;
-    if (note->expDecay) {
-      // fitted using gradient descent
-      static const double COEF = 64.9707;
-      static const double ADJ = 1.4875;
-      note->decay = decay ? std::log(decay * factor) * COEF - ADJ : 0;
-      note->release = release * factor; //  ? std::log(release * factor) * COEF - ADJ : 0;
-    } else {
-      note->decay = decay * factor;
-      note->release = release * factor;
-    }
+  double startGain = 1.0;
+  double eAttack = 1.0;
+  if (attack) {
+    startGain = 1.0 - (60 * attack) / 255;
+    eAttack = attack * factor;
   }
-  return event;
+
+  bool expDecay = (type & 0x7) == 0;
+  double eDecay = decay * factor;
+  double eRelease = release * factor;
+  if (expDecay) {
+    // fitted using gradient descent
+    static const double COEF = 64.9707;
+    static const double ADJ = 1.4875;
+    eDecay = eDecay ? std::log(eDecay) * COEF - ADJ : 0;
+    // eRelease = eRelease ? std::log(eRelease) * COEF - ADJ : 0;
+  }
+
+  Envelope* env = new Envelope(channel->ctx, eAttack, 0, eDecay, sustain, 0, eRelease);
+  env->expAttack = false;
+  env->expDecay = expDecay;
+  env->param(Envelope::StartGain)->setConstant(startGain);
+  env->connect(note->source);
+  note->source.reset(env);
+  return note;
 }
 
 SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
@@ -196,27 +199,41 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
     sample->loopStart = loopStart;
     sample->loopEnd = loopEnd;
 
+    /*
     std::ostringstream fnss;
     fnss << "dump/sample-" << std::hex << (sampleAddr) << ".wav";
     RiffWriter dump(sampleRate, false);
     dump.open(fnss.str());
     dump.write(sample->channels[0]);
     dump.close();
+    */
   }
 }
 
-SequenceEvent* SampleInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
+BaseNoteEvent* SampleInstrument::makeEvent(double, uint8_t key, uint8_t vel, double len) const
 {
   if (key & 0x80) return nullptr;
-  static const double cFreq = 261.6256;
-  double freq = noteToFreq((int8_t)key);
-  SampleEvent* event = new SampleEvent;
+  InstrumentNoteEvent* event = new InstrumentNoteEvent;
   event->duration = len;
-  event->pitchBend = freq / cFreq;
-  event->sampleID = sample->sampleID;
+  event->pitch = key;
   // TODO: velocity accuracy
   event->volume = (vel / 127.0);
-  return addEnvelope(event, 1.0);
+  return event;
+}
+
+Channel::Note* SampleInstrument::noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event)
+{
+  static const double cFreq = 261.6256;
+  double freq = noteToFreq(int8_t(static_cast<InstrumentNoteEvent*>(event.get())->pitch));
+  std::shared_ptr<AudioNode> node(new Sampler(channel->ctx, sample, freq / cFreq));
+  node->param(AudioNode::Gain)->setConstant(event->volume);
+  node->param(AudioNode::Pan)->setConstant(event->pan);
+  double duration = event->duration;
+  if (!duration) {
+    duration = sample->duration();
+  }
+  Channel::Note* note = channel->allocNote(event, node, duration);
+  return addEnvelope(channel, note, 1.0);
 }
 
 PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
@@ -228,34 +245,51 @@ PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
   mode = rom->read<uint8_t>(addr + 4);
 }
 
-SequenceEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
+BaseNoteEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
-  OscillatorEvent* event = new OscillatorEvent;
+  InstrumentNoteEvent* event = new InstrumentNoteEvent;
   event->duration = (gate && len > gate) ? gate : len;
-  event->frequency = noteToFreq(key);
+  event->pitch = key;
+  event->volume = (vel / 127.0);
+  return event;
+}
+
+Channel::Note* PSGInstrument::noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event)
+{
+  BaseOscillator::WaveformPreset waveformID = BaseOscillator::Square50;
   if (type == Noise) {
     if (mode & 1) {
-      event->waveformID = BaseOscillator::GBNoise127;
+      waveformID = BaseOscillator::GBNoise127;
     } else {
-      event->waveformID = BaseOscillator::GBNoise;
+      waveformID = BaseOscillator::GBNoise;
     }
   } else if (mode == 0) {
-    event->waveformID = BaseOscillator::Square125;
+    waveformID = BaseOscillator::Square125;
   } else if (mode == 1) {
-    event->waveformID = BaseOscillator::Square25;
+    waveformID = BaseOscillator::Square25;
+  /*
   } else if (mode == 2) {
-    event->waveformID = BaseOscillator::Square50;
+    waveformID = BaseOscillator::Square50;
+  */
   } else if (mode == 3) {
-    event->waveformID = BaseOscillator::Square75;
+    waveformID = BaseOscillator::Square75;
   }
+  // TODO: velocity accuracy
+  double volume = event->volume * 0.3;
+  std::shared_ptr<AudioNode> node(BaseOscillator::create(
+      channel->ctx,
+      waveformID,
+      noteToFreq(static_cast<InstrumentNoteEvent*>(event.get())->pitch),
+      volume,
+      event->pan
+  ));
+  Channel::Note* note = channel->allocNote(event, node, event->duration);
   /*
   if (sweep) {
     node = new SweepNode(ctx, node, sweep);
   }
   */
-  // TODO: velocity accuracy
-  event->volume = (vel / 127.0) * .3;
-  return addEnvelope(event, volume);
+  return addEnvelope(channel, note, volume);
 }
 
 SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
@@ -275,20 +309,26 @@ SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
   }
 }
 
-SequenceEvent* SplitInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
+BaseNoteEvent* SplitInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
   auto split = splits.at(key).get();
   if (!split) {
     return nullptr;
   }
-  SequenceEvent* event = split->makeEvent(volume, key, vel, len);
+  BaseNoteEvent* event = split->makeEvent(volume, key, vel, len);
   if (split->forcePan && split->pan != 64) {
-    BaseNoteEvent* noteEvent = dynamic_cast<BaseNoteEvent*>(event);
-    if (noteEvent) {
-      noteEvent->pan = split->pan;
-    }
+    event->pan = split->pan;
   }
   return event;
+}
+
+Channel::Note* SplitInstrument::noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event)
+{
+  auto split = splits.at(size_t(static_cast<InstrumentNoteEvent*>(event.get())->pitch));
+  if (!split) {
+    return nullptr;
+  }
+  return split->noteEvent(channel, event);
 }
 
 InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
@@ -297,6 +337,9 @@ InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
     MpInstrument* inst = MpInstrument::load(rom, addr);
     if (inst) {
       instruments.emplace_back(inst);
+      if (rom->synthContext()) {
+        rom->synthContext()->registerInstrument(instruments.size(), std::unique_ptr<IInstrument>(inst));
+      }
     } else {
       //std::cout << "unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
       instruments.emplace_back(nullptr);

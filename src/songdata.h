@@ -7,6 +7,7 @@
 #include <unordered_map>
 class ROMFile;
 class SongData;
+class SynthContext;
 
 struct RawEvent {
   uint32_t addr;

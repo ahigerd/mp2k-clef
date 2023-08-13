@@ -7,6 +7,7 @@
 #include <iostream>
 #include "utility.h"
 class S2WContext;
+class SynthContext;
 class SongTable;
 
 class ROMFile {
@@ -26,10 +27,11 @@ public:
   ROMFile& operator=(const ROMFile& other) = delete;
   ROMFile& operator=(ROMFile&& other) = delete;
 
-  void load(const std::string& path);
-  void load(std::istream& stream);
+  void load(SynthContext* synth, const std::string& path);
+  void load(SynthContext* synth, std::istream& stream);
 
   inline S2WContext* context() const { return ctx; }
+  inline SynthContext* synthContext() const { return synth; }
 
   SongTable findSongTable(int minSongs = -1, uint32_t offset = 0x200) const;
   std::vector<SongTable> findSongTables(uint32_t offset = 0x200) const;
@@ -61,6 +63,7 @@ private:
   uint32_t cleanDeref(uint32_t addr, uint32_t size = 4, bool align = true, bool alignPointer = true) const;
 
   S2WContext* ctx;
+  SynthContext* synth;
 };
 
 #endif
