@@ -80,7 +80,18 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
     return nullptr;
   }
   uint8_t type = rom->read<uint8_t>(addr);
-  uint8_t normType = type & 0x7 ? type & 0x7 : type;
+  if (type == Square1) {
+    if (rom->read<uint64_t>(addr) == 0x0000000200003c01ULL && rom->read<uint32_t>(addr + 8) == 0x000f0000) {
+      // unused instrument
+      return nullptr;
+    }
+  }
+
+
+  uint8_t normType = type;
+  if (normType < 0x10) {
+    normType &= 0x7;
+  }
   try {
     switch (normType) {
       case GBSample:
@@ -101,10 +112,10 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
         return nullptr;
     }
   } catch (ROMFile::BadAccess& e) {
-    std::cerr << "Bad pointer loading " << int(type) << " instrument at 0x" << std::hex << addr << std::dec << std::endl;
+    //std::cerr << "Bad pointer loading " << int(type) << " instrument at 0x" << std::hex << addr << std::dec << std::endl;
     return nullptr;
   } catch (std::exception& e) {
-    std::cerr << "Error loading " << int(type) << " instrument at 0x" << std::hex << addr << std::dec << ": " << e.what() << std::endl;
+    //std::cerr << "Error loading " << int(type) << " instrument at 0x" << std::hex << addr << std::dec << ": " << e.what() << std::endl;
     return nullptr;
   }
 }
@@ -144,7 +155,7 @@ Channel::Note* MpInstrument::addEnvelope(Channel* channel, Channel::Note* note, 
     static const double COEF = 64.9707;
     static const double ADJ = 1.4875;
     eDecay = eDecay ? std::log(eDecay) * COEF - ADJ : 0;
-    // eRelease = eRelease ? std::log(eRelease) * COEF - ADJ : 0;
+    eRelease = eRelease ? std::log(eRelease) * COEF - ADJ : 0;
   }
 
   Envelope* env = new Envelope(channel->ctx, eAttack, 0, eDecay, sustain, 0, eRelease);
@@ -154,6 +165,35 @@ Channel::Note* MpInstrument::addEnvelope(Channel* channel, Channel::Note* note, 
   env->connect(note->source);
   note->source.reset(env);
   return note;
+}
+
+bool MpInstrument::operator==(const MpInstrument* other) const
+{
+  if (!other) {
+    return false;
+  }
+  if (other == this) {
+    // reflexive identity
+    return true;
+  }
+  if (other->type != type || other->attack != attack || other->decay != decay ||
+      other->sustain != sustain || other->release != release || other->gate != gate) {
+    return false;
+  }
+  if (type == Sample || type == GBSample || type == FixedSample) {
+    const SampleInstrument* s1 = static_cast<const SampleInstrument*>(this);
+    const SampleInstrument* s2 = static_cast<const SampleInstrument*>(other);
+    return s1->sample == s2->sample;
+  } else if (type == Square1 || type == Square2 || type == Noise) {
+    const PSGInstrument* s1 = static_cast<const PSGInstrument*>(this);
+    const PSGInstrument* s2 = static_cast<const PSGInstrument*>(other);
+    return s1->mode == s2->mode && s1->sweep == s2->sweep;
+  } else if (type == KeySplit || type == Percussion) {
+    const SplitInstrument* s1 = static_cast<const SplitInstrument*>(this);
+    const SplitInstrument* s2 = static_cast<const SplitInstrument*>(other);
+    return s1->splits == s2->splits;
+  }
+  return false;
 }
 
 SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
@@ -210,6 +250,18 @@ SampleInstrument::SampleInstrument(const ROMFile* rom, uint32_t addr)
   }
 }
 
+std::string SampleInstrument::displayName() const
+{
+  std::ostringstream ss;
+  if (type == GBSample) {
+    ss << "Waveform";
+  } else {
+    ss << "Sample";
+  }
+  ss << " (0x" << std::hex << addr << ")";
+  return ss.str();
+}
+
 BaseNoteEvent* SampleInstrument::makeEvent(double, uint8_t key, uint8_t vel, double len) const
 {
   if (key & 0x80) return nullptr;
@@ -243,6 +295,37 @@ PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
     sweep = rom->read<uint8_t>(addr + 3);
   }
   mode = rom->read<uint8_t>(addr + 4);
+  bool err = rom->read<uint8_t>(addr + 5) || rom->read<uint8_t>(addr + 6) || rom->read<uint8_t>(addr + 7);
+  if (type == Noise) {
+    err = err || mode > 1;
+  } else {
+    err = err || mode > 3;
+  }
+  if (err) {
+    throw std::runtime_error("invalid PSG instrument type " + std::to_string(mode));
+  }
+}
+
+std::string PSGInstrument::displayName() const
+{
+  std::ostringstream ss;
+  if (type == Square1 || type == Square2) {
+    ss << "Square ";
+    if (mode == 0) {
+      ss << "(12.5%)";
+    } else if (mode == 1) {
+      ss << "(25%)";
+    } else if (mode == 2) {
+      ss << "(50%)";
+    } else if (mode == 3) {
+      ss << "(75%)";
+    }
+  } else if (type == Noise) {
+    ss << "Noise (type " << int(mode) << ")";
+  } else {
+    ss << "PSG (type " << int(type) << ")";
+  }
+  return ss.str();
 }
 
 BaseNoteEvent* PSGInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
@@ -309,6 +392,18 @@ SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
   }
 }
 
+std::string SplitInstrument::displayName() const
+{
+  std::ostringstream ss;
+  if (type == KeySplit) {
+    ss << "Split";
+  } else {
+    ss << "Percussion";
+  }
+  ss << " (0x" << std::hex << addr << ")";
+  return ss.str();
+}
+
 BaseNoteEvent* SplitInstrument::makeEvent(double volume, uint8_t key, uint8_t vel, double len) const
 {
   auto split = splits.at(key).get();
@@ -333,17 +428,45 @@ Channel::Note* SplitInstrument::noteEvent(Channel* channel, std::shared_ptr<Base
 
 InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
 {
-  while (addr < rom->rom.size() && instruments.size() < 127) {
-    MpInstrument* inst = MpInstrument::load(rom, addr);
+  int numInst = 0;
+  for (int i = 0; i < 128; i++) {
+    instruments[i] = 0;
+  }
+  while (addr < rom->rom.size() && numInst < 128) {
+    MpInstrument* inst = static_cast<MpInstrument*>(rom->synthContext()->getInstrument(addr));
     if (inst) {
-      instruments.emplace_back(inst);
-      if (rom->synthContext()) {
-        rom->synthContext()->registerInstrument(instruments.size(), std::unique_ptr<IInstrument>(inst));
-      }
+      instruments[numInst] = addr;
     } else {
-      //std::cout << "unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
-      instruments.emplace_back(nullptr);
+      inst = MpInstrument::load(rom, addr);
+      if (inst) {
+        //std::cerr << numInst << ": Loaded 0x" << std::hex << addr << " of type " << std::dec << inst->type << std::endl;
+        if (rom->synthContext()) {
+          MpInstrument* dupe = nullptr;
+          int numInsts = rom->synthContext()->numInstruments();
+          for (int i = 0; i < numInsts; i++) {
+            uint64_t otherID = rom->synthContext()->instrumentID(i);
+            MpInstrument* other = static_cast<MpInstrument*>(rom->synthContext()->getInstrument(otherID));
+            if (*inst == other) {
+              dupe = other;
+              break;
+            }
+          }
+          if (dupe) {
+            instruments[numInst] = dupe->addr;
+            delete inst;
+          } else {
+            instruments[numInst] = addr;
+            rom->synthContext()->registerInstrument(addr, std::unique_ptr<IInstrument>(inst));
+          }
+        } else {
+          instruments[numInst] = numInst;
+        }
+      } else {
+        //std::cout << numInst << ": unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
+        instruments[numInst] = 0;
+      }
     }
     addr += 12;
+    numInst++;
   }
 }

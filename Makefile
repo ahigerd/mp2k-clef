@@ -22,6 +22,8 @@ foobar: foo_input_$(PLUGIN_NAME).dll
 
 clap: $(PLUGIN_NAME).clap
 
+clapdebug: $(PLUGIN_NAME)_d.clap
+
 seq2wav/src:
 	git submodule update --init --recursive
 
@@ -80,6 +82,9 @@ in_$(PLUGIN_NAME).dll in_$(PLUGIN_NAME)_d.dll: FORCE
 endif
 
 $(PLUGIN_NAME).clap: $(PLUGIN_NAME)$(EXE) seq2wav/$(BUILDPATH)/libseq2wav.a plugins/Makefile config.mak plugins/s2wplugin.cpp
+	$(MAKE) -C plugins ../$@
+
+$(PLUGIN_NAME)_d.clap: $(PLUGIN_NAME)_d$(EXE) seq2wav/$(BUILDPATH)/libseq2wav_d.a plugins/Makefile config.mak plugins/s2wplugin.cpp
 	$(MAKE) -C plugins ../$@
 
 guiclean: FORCE

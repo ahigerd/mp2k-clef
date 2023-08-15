@@ -26,17 +26,21 @@ ROMFile::ROMFile(S2WContext* ctx)
 void ROMFile::load(SynthContext* synth, const std::string& path)
 {
   std::ifstream f(path);
-  load(synth, f);
+  load(synth, f, path);
 }
 
-void ROMFile::load(SynthContext* synth, std::istream& f)
+void ROMFile::load(SynthContext* synth, std::istream& f, const std::string& path)
 {
   this->synth = synth;
+  if (path == filename) {
+    return;
+  }
   uint8_t buffer[1024];
   while (f) {
     f.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
     rom.insert(rom.end(), buffer, buffer + f.gcount());
   }
+  filename = path;
 }
 
 uint32_t ROMFile::cleanPointer(uint32_t addr, uint32_t size, bool align) const

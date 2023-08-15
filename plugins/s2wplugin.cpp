@@ -20,40 +20,64 @@ static SynthContext* openBySubsong(S2WContext* ctx, std::unique_ptr<ROMFile>& ro
   SynthContext* synth = nullptr;
   try {
     synth = new SynthContext(ctx, 32768);
-    rom.reset(new ROMFile(ctx));
-    if (file) {
-      rom->load(synth, file);
-    } else {
-      size_t qpos = filename.rfind('?');
-      auto newFile(ctx->openFile(filename.substr(0, qpos)));
-      rom->load(synth, *newFile);
-    }
-    std::cerr << "loaded " << rom->rom.size() << " bytes " << filename << std::endl;
-
     size_t qpos = filename.rfind('?');
-    std::string subsong;
-    if (qpos != std::string::npos) {
-      subsong = filename.substr(qpos + 1);
+    std::string baseFile = filename.substr(0, qpos);
+    bool alreadyLoaded = rom && rom->filename == baseFile;
+    if (!alreadyLoaded) {
+      rom.reset(new ROMFile(ctx));
     }
-    if (subsong.substr(0, 2) == "0x") {
-      uint32_t addr = std::stoi(subsong, nullptr, 0);
-      std::cerr << "loading " << std::hex << addr << std::endl;
-      songData.reset(new SongData(rom.get(), addr));
+    if (file) {
+      rom->load(synth, file, baseFile);
     } else {
-      SongTable st = rom->findSongTable(-1);
-      int index = std::stoi(subsong.empty() ? "0" : subsong);
-      std::cerr << "loading index " << index << std::endl;
-      songData.reset(st.songFromTable(index));
+      auto newFile(ctx->openFile(baseFile));
+      rom->load(synth, *newFile, baseFile);
     }
 
-    for (int i = 0; i < songData->numTracks(); i++) {
-      synth->addChannel(songData->getTrack(i));
+    if (ctx->isDawPlugin) {
+      SongTable st = rom->findSongTable(-1);
+      int numSongs = st.songs.size();
+      for (int index = 0; index < numSongs; index++) {
+        // initialize instruments
+        try {
+          st.songFromTable(index);
+        } catch (...) {
+          // ignore
+        }
+      }
+    } else {
+      std::string subsong;
+      if (qpos != std::string::npos) {
+        subsong = filename.substr(qpos + 1);
+      }
+      if (subsong.substr(0, 2) == "0x") {
+        uint32_t addr = std::stoi(subsong, nullptr, 0);
+        songData.reset(new SongData(rom.get(), addr));
+      } else {
+        SongTable st = rom->findSongTable(-1);
+        int index = std::stoi(subsong.empty() ? "0" : subsong);
+        do {
+          try {
+            songData.reset(st.songFromTable(index));
+            break;
+          } catch (std::exception& e) {
+            ++index;
+            if (index >= st.songs.size()) {
+              throw;
+            }
+          }
+        } while (!songData);
+      }
+
+      for (int i = 0; i < songData->numTracks(); i++) {
+        synth->addChannel(songData->getTrack(i));
+      }
     }
 
     return synth;
-  } catch (...) {
+  } catch (std::exception& e) {
+    std::cerr << "error in openBySubsong " << e.what() << std::endl;
     delete synth;
-    return nullptr;
+    throw;
   }
 }
 
@@ -87,15 +111,36 @@ struct S2WPluginInfo {
     if (iter != durationCache.end()) {
       return iter->second;
     }
-    std::unique_ptr<SongData> lengthSong;
-    std::unique_ptr<ROMFile> lengthRom;
-    std::unique_ptr<SynthContext> synth(openBySubsong(ctx, lengthRom, lengthSong, filename, file));
-    double length = 0;
-    if (synth) {
-      length = synth->maximumTime();
+    size_t qpos = filename.rfind('?');
+    std::string base = filename.substr(0, qpos);
+    std::unique_ptr<ROMFile> lengthRom(new ROMFile(ctx));
+    lengthRom->load(nullptr, file, base);
+    SongTable st = lengthRom->findAllSongs();
+    std::vector<std::string> subsongs;
+    bool first = true;
+    for (uint32_t song : st.songs) {
+      std::ostringstream ss;
+      ss << base << "?0x" << std::hex << std::setw(6) << std::setfill('0') << song;
+      std::string subsong = ss.str();
+
+      std::unique_ptr<SongData> lengthSong;
+      double length = 0;
+      try {
+        std::unique_ptr<SynthContext> synth(openBySubsong(ctx, lengthRom, lengthSong, subsong, file));
+        if (synth) {
+          length = synth->maximumTime();
+          subsongs.push_back(subsong);
+        }
+      } catch (...) {
+        // ignore
+      }
+      durationCache[subsong] = length;
+      if (first && filename != subsong) {
+        durationCache[filename] = length;
+      }
     }
-    durationCache[filename] = length;
-    return length;
+    subsongCache[base] = subsongs;
+    return durationCache[filename];
   }
 
   static TagMap readTags(S2WContext* ctx, const std::string& filename, std::istream& file) {
@@ -113,20 +158,9 @@ struct S2WPluginInfo {
     if (iter != subsongCache.end()) {
       return iter->second;
     }
-
-    std::vector<std::string> subsongs;
-    ROMFile rom(s2w);
-    rom.load(nullptr, file);
-    SongTable st = rom.findAllSongs();
-
-    for (uint32_t song : st.songs) {
-      std::ostringstream ss;
-      ss << base << "?0x" << std::hex << std::setw(6) << std::setfill('0') << song;
-      subsongs.push_back(ss.str());
-    }
-
-    subsongCache[base] = subsongs;
-    return subsongs;
+    subsongCache[base] = std::vector<std::string>();
+    length(s2w, base, file);
+    return subsongCache.at(base);
   }
 
   SynthContext* prepare(S2WContext* ctx, const std::string& filename, std::istream& file) {
@@ -135,6 +169,7 @@ struct S2WPluginInfo {
 
     // Be sure to call this to clear the sample cache:
     ctx->purgeSamples();
+    rom.reset(nullptr);
 
     return openBySubsong(ctx, rom, songData, filename, file);
   }
@@ -149,6 +184,8 @@ struct S2WPluginInfo {
 const std::string S2WPluginInfo::version = "0.0.1";
 const std::string S2WPluginInfo::pluginName = "gbamp2wav";
 const std::string S2WPluginInfo::pluginShortName = "gbamp2wav";
+const std::string S2WPluginInfo::author = "Adam Higerd";
+const std::string S2WPluginInfo::url = "https://bitbucket.org/ahigerd/gbamp2wav";
 ConstPairList S2WPluginInfo::extensions = { { "gba", "GBA ROM images (*.gba)" } };
 const std::string S2WPluginInfo::about =
   "gbamp2wav copyright (C) 2020-2023 Adam Higerd\n"

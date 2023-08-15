@@ -28,7 +28,7 @@ public:
   ROMFile& operator=(ROMFile&& other) = delete;
 
   void load(SynthContext* synth, const std::string& path);
-  void load(SynthContext* synth, std::istream& stream);
+  void load(SynthContext* synth, std::istream& stream, const std::string& path);
 
   inline S2WContext* context() const { return ctx; }
   inline SynthContext* synthContext() const { return synth; }
@@ -38,6 +38,7 @@ public:
   SongTable findAllSongs() const;
   bool checkSong(uint32_t addr, bool deep = true) const;
 
+  std::string filename;
   std::vector<uint8_t> rom;
   uint32_t sampleRate;
 

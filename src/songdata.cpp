@@ -1,6 +1,7 @@
 #include "songdata.h"
 #include "romfile.h"
 #include "synth/audionode.h"
+#include "synth/synthcontext.h"
 #include <unordered_map>
 #include <sstream>
 #include <iomanip>
@@ -382,7 +383,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
             currentInstrument = song->getInstrument(instID);
             std::cerr << trackIndex << ": Using instrument " << std::dec << instID << " (" << (currentInstrument ? (int)currentInstrument->type : -1) << ") " << std::endl;
             if (currentInstrument) {
-              pendingEvents.emplace_back(new ChannelEvent('inst', uint64_t(instID)));
+              pendingEvents.emplace_back(new ChannelEvent('inst', uint64_t(currentInstrument->addr)));
               releaseTime = currentInstrument->release;
             }
           }
@@ -484,8 +485,9 @@ SongData::SongData(const ROMFile* rom, uint32_t addr)
 {
   int numTracks = rom->read<uint8_t>(addr);
   MpInstrument* defaultInst = nullptr;
-  for (int i = 0; !defaultInst && i < instruments.instruments.size(); i++) {
-    defaultInst = getInstrument(i);
+  if (rom->synthContext()) {
+    int defaultInstId = rom->synthContext()->instrumentID(0);
+    defaultInst = static_cast<MpInstrument*>(rom->synthContext()->getInstrument(defaultInstId));
   }
   for (int i = 0; i < numTracks; i++) {
     TrackData* track = new TrackData(this, i, rom->readPointer(addr + 8 + i * 4, false), defaultInst);
@@ -503,14 +505,14 @@ bool SongData::canLoop() const
 
 MpInstrument* SongData::getInstrument(uint8_t id) const
 {
-  if (id >= instruments.instruments.size()) {
-    MpInstrument* defaultInst = nullptr;
-    for (int i = 0; !defaultInst && i < instruments.instruments.size(); i++) {
-      defaultInst = getInstrument(i);
-    }
-    return defaultInst;
+  if (id >= 128) {
+    return nullptr;
   }
-  return instruments.instruments.at(id);
+  uint32_t addr = instruments.instruments[id];
+  if (!addr) {
+    return nullptr;
+  }
+  return static_cast<MpInstrument*>(rom->synthContext()->getInstrument(addr));
 }
 
 void SongData::showParsed(std::ostream& out)

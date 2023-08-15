@@ -38,6 +38,9 @@ public:
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const = 0;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event) = 0;
 
+  inline bool operator==(const MpInstrument& other) const { return *this == &other; }
+  bool operator==(const MpInstrument* other) const;
+
 protected:
   Channel::Note* addEnvelope(Channel* channel, Channel::Note* event, double factor) const;
 };
@@ -50,6 +53,7 @@ public:
 
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
+  virtual std::string displayName() const;
 };
 
 class PSGInstrument : public MpInstrument {
@@ -60,6 +64,7 @@ public:
 
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
+  virtual std::string displayName() const;
 };
 
 class SplitInstrument : public MpInstrument {
@@ -70,13 +75,14 @@ public:
 
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
+  virtual std::string displayName() const;
 };
 
 class InstrumentData {
 public:
   InstrumentData(const ROMFile* rom, uint32_t addr);
 
-  std::vector<MpInstrument*> instruments;
+  uint32_t instruments[128];
 };
 
 #endif
