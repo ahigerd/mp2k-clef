@@ -3,4 +3,4 @@
 	url = https://bitbucket.org/ahigerd/seq2wav
 [submodule "clap"]
 	path = plugins/clap
-	url = ./clap
+	url = https://github.com/free-audio/clap.git
