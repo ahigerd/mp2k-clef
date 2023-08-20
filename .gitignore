@@ -30,6 +30,7 @@ include
 *_gui
 *_gui_d
 *.clap
+*.vst3
 gui/Makefile*
 
 # external dependencies

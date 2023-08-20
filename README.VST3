@@ -1,0 +1,8 @@
+The VST3 plugin is a wrapper around the CLAP plugin.
+
+To use the VST3 plugin, put the win64 CLAP plugin in the canonical system path:
+  C:\Program Files\Common Files\CLAP\
+
+The VST3 plugin can be installed wherever your DAW searches for them. The standard
+path for VST3 plugins is:
+  C:\Program Files\Common Files\VST3\
