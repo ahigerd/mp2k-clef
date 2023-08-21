@@ -83,6 +83,9 @@ public:
   InstrumentData(const ROMFile* rom, uint32_t addr);
 
   uint32_t instruments[128];
+
+private:
+  MpInstrument* findDupe(SynthContext* synth, const MpInstrument& inst) const;
 };
 
 #endif

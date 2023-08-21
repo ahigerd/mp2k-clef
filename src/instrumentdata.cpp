@@ -428,45 +428,48 @@ Channel::Note* SplitInstrument::noteEvent(Channel* channel, std::shared_ptr<Base
 
 InstrumentData::InstrumentData(const ROMFile* rom, uint32_t addr)
 {
-  int numInst = 0;
   for (int i = 0; i < 128; i++) {
     instruments[i] = 0;
   }
-  while (addr < rom->rom.size() && numInst < 128) {
-    MpInstrument* inst = static_cast<MpInstrument*>(rom->synthContext()->getInstrument(addr));
+  SynthContext* synth = rom->synthContext();
+  for (int instId = 0; addr < rom->rom.size() && instId < 128; addr += 12, instId++) {
+    MpInstrument* inst = synth ? static_cast<MpInstrument*>(synth->getInstrument(addr)) : nullptr;
     if (inst) {
-      instruments[numInst] = addr;
-    } else {
-      inst = MpInstrument::load(rom, addr);
-      if (inst) {
-        //std::cerr << numInst << ": Loaded 0x" << std::hex << addr << " of type " << std::dec << inst->type << std::endl;
-        if (rom->synthContext()) {
-          MpInstrument* dupe = nullptr;
-          int numInsts = rom->synthContext()->numInstruments();
-          for (int i = 0; i < numInsts; i++) {
-            uint64_t otherID = rom->synthContext()->instrumentID(i);
-            MpInstrument* other = static_cast<MpInstrument*>(rom->synthContext()->getInstrument(otherID));
-            if (*inst == other) {
-              dupe = other;
-              break;
-            }
-          }
-          if (dupe) {
-            instruments[numInst] = dupe->addr;
-            delete inst;
-          } else {
-            instruments[numInst] = addr;
-            rom->synthContext()->registerInstrument(addr, std::unique_ptr<IInstrument>(inst));
-          }
-        } else {
-          instruments[numInst] = numInst;
-        }
-      } else {
-        //std::cout << numInst << ": unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
-        instruments[numInst] = 0;
-      }
+      instruments[instId] = addr;
+      continue;
     }
-    addr += 12;
-    numInst++;
+    inst = MpInstrument::load(rom, addr);
+    if (!inst) {
+      //std::cout << instId << ": unknown/bad instrument @ 0x" << std::hex << addr << std::endl;
+      instruments[instId] = 0;
+      continue;
+    }
+    //std::cerr << instId << ": Loaded 0x" << std::hex << addr << " of type " << std::dec << inst->type << std::endl;
+    MpInstrument* dupe = findDupe(synth, *inst);
+    if (dupe) {
+      instruments[instId] = dupe->addr;
+      delete inst;
+    } else if (synth) {
+      instruments[instId] = addr;
+      synth->registerInstrument(addr, std::unique_ptr<IInstrument>(inst));
+    } else {
+      instruments[instId] = instId;
+    }
   }
+}
+
+MpInstrument* InstrumentData::findDupe(SynthContext* synth, const MpInstrument& inst) const
+{
+  if (!synth) {
+    return nullptr;
+  }
+  int numInsts = synth->numInstruments();
+  for (int i = 0; i < numInsts; i++) {
+    uint64_t otherID = synth->instrumentID(i);
+    MpInstrument* other = static_cast<MpInstrument*>(synth->getInstrument(otherID));
+    if (inst == other) {
+      return other;
+    }
+  }
+  return nullptr;
 }
