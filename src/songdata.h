@@ -31,6 +31,7 @@ struct Mp2kEvent {
   uint16_t value;
   uint8_t param;
   uint8_t duration;
+  RawEvent raw;
 };
 
 class TrackData : public ITrack {
@@ -62,7 +63,7 @@ protected:
   size_t playIndex;
   double playTime;
   double secPerTick;
-  double lengthCache;
+  mutable double lengthCache;
   MpInstrument* currentInstrument;
   std::vector<RawEvent> rawEvents;
   std::vector<Mp2kEvent> events;
@@ -95,6 +96,8 @@ public:
 
   std::vector<std::pair<double, double>> tempos;
   std::unordered_map<uint8_t, TrackData::ActiveNote> activePsg;
+
+  double tickLengthAt(double timestamp) const;
 
 private:
   bool hasLoop;

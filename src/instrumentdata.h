@@ -41,6 +41,8 @@ public:
   inline bool operator==(const MpInstrument& other) const { return *this == &other; }
   bool operator==(const MpInstrument* other) const;
 
+  virtual void showParsed(std::ostream& out, std::string indent = std::string()) const;
+
 protected:
   Channel::Note* addEnvelope(Channel* channel, Channel::Note* event, double factor) const;
 };
@@ -54,6 +56,8 @@ public:
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
   virtual std::string displayName() const;
+
+  //virtual void showParsed(std::ostream& out, std::string indent = std::string()) const;
 };
 
 class PSGInstrument : public MpInstrument {
@@ -65,6 +69,8 @@ public:
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
   virtual std::string displayName() const;
+
+  //virtual void showParsed(std::ostream& out, std::string indent = std::string()) const;
 };
 
 class SplitInstrument : public MpInstrument {
@@ -76,6 +82,8 @@ public:
   virtual BaseNoteEvent* makeEvent(double volume, uint8_t key, uint8_t vel, double len) const;
   virtual Channel::Note* noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event);
   virtual std::string displayName() const;
+
+  virtual void showParsed(std::ostream& out, std::string indent = std::string()) const;
 };
 
 class InstrumentData {

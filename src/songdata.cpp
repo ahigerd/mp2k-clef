@@ -189,6 +189,7 @@ TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* def
     rawEvents.push_back(raw);
     pos += eventSize;
     Mp2kEvent ev;
+    ev.raw = raw;
     ev.effAddr = (uint64_t(returnAddr) << 32) | raw.addr;
     ev.duration = 0;
     size_t index = events.size();
@@ -323,8 +324,30 @@ void TrackData::internalReset()
 
 double TrackData::length() const
 {
-  // TODO
-  return 20;
+  if (lengthCache < 0) {
+    double spt = 1.0 / 60.0;
+    double lastEnd = 0;
+    double time = 0;
+    int lastIndex = events.size();
+    for (int index = 0; index < lastIndex; index++) {
+      const Mp2kEvent& ev = events[index];
+      if (ev.type == Mp2kEvent::Rest) {
+        time += ev.duration * spt;
+        spt = song->tickLengthAt(time);
+      } else if (ev.type == Mp2kEvent::Note && ev.duration != 0xFF) {
+        // TODO: release trails
+        double end = time + ev.duration * spt;
+        if (end > lastEnd) {
+          lastEnd = end;
+        }
+      } else if (ev.type == Mp2kEvent::Stop || ev.type == Mp2kEvent::Goto) {
+        // Since the sequences are pre-processed, a goto event is a loop point
+        break;
+      }
+    }
+    lengthCache = (time > lastEnd ? time : lastEnd) + 1;
+  }
+  return lengthCache;
 }
 
 bool TrackData::isFinished() const
@@ -332,22 +355,23 @@ bool TrackData::isFinished() const
   return stopped || playIndex >= events.size() || playTime > length();
 }
 
+double SongData::tickLengthAt(double timestamp) const
+{
+  for (int i = tempos.size() - 1; i >= 0; --i) {
+    if (tempos[i].first <= timestamp) {
+      return tempos[i].second;
+    }
+  }
+  return 1.0 / 60.0;
+}
+
 std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
 {
   bool didGoto = false;
   while (!isFinished() && !pendingEvents.size()) {
-    std::cerr << trackIndex << ":" << playIndex << "@" << playTime << "\t" << rawEvents[playIndex].render() << std::endl;
+    //std::cerr << trackIndex << ":" << playIndex << "@" << playTime << "\t" << events[playIndex].raw.render() << std::endl;
     const Mp2kEvent& event = events[playIndex++];
-    for (int i = song->tempos.size() - 1; i >= 0; --i) {
-      const auto& tempo = song->tempos[i];
-      if (tempo.first <= playTime) {
-        if (secPerTick != tempo.second) {
-          // TODO: adjust remaining note play time
-          secPerTick = tempo.second;
-        }
-        break;
-      }
-    }
+    secPerTick = song->tickLengthAt(playTime);
     double duration = event.duration == 0xFF ? -1 : event.duration * secPerTick;
     if (event.type == Mp2kEvent::Stop) {
       stopped = true;
@@ -393,7 +417,7 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           pendingEvents.back()->timestamp = playTime;
           break;
         case VOL:
-          pendingEvents.emplace_back(new ChannelEvent(AudioNode::Gain, 4 * event.value / 127.0));
+          pendingEvents.emplace_back(new ChannelEvent(AudioNode::Gain, 2 * event.value / 127.0));
           pendingEvents.back()->timestamp = playTime;
           volume = event.value / 127.0;
           break;

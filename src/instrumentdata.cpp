@@ -87,7 +87,6 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
     }
   }
 
-
   uint8_t normType = type;
   if (normType < 0x10) {
     normType &= 0x7;
@@ -258,7 +257,8 @@ std::string SampleInstrument::displayName() const
   } else {
     ss << "Sample";
   }
-  ss << " (0x" << std::hex << addr << ")";
+  uint32_t sampleAddr = (sample->sampleID & 0xFFFFFFFF);
+  ss << " (0x" << std::hex << sampleAddr << ")";
   return ss.str();
 }
 
@@ -276,8 +276,12 @@ BaseNoteEvent* SampleInstrument::makeEvent(double, uint8_t key, uint8_t vel, dou
 Channel::Note* SampleInstrument::noteEvent(Channel* channel, std::shared_ptr<BaseNoteEvent> event)
 {
   static const double cFreq = 261.6256;
-  double freq = noteToFreq(int8_t(static_cast<InstrumentNoteEvent*>(event.get())->pitch));
-  std::shared_ptr<AudioNode> node(new Sampler(channel->ctx, sample, freq / cFreq));
+  double ratio = 1.0;
+  if (type != FixedSample) {
+    double freq = noteToFreq(int8_t(static_cast<InstrumentNoteEvent*>(event.get())->pitch));
+    ratio = freq / cFreq;
+  }
+  std::shared_ptr<AudioNode> node(new Sampler(channel->ctx, sample, ratio));
   node->param(AudioNode::Gain)->setConstant(event->volume);
   node->param(AudioNode::Pan)->setConstant(event->pan);
   double duration = event->duration;
@@ -378,6 +382,7 @@ Channel::Note* PSGInstrument::noteEvent(Channel* channel, std::shared_ptr<BaseNo
 SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
 : MpInstrument(rom, addr)
 {
+  attack = -1;
   uint32_t splitAddr = rom->readPointer(0x08000000 | (addr + 4));
   if (type == Percussion) {
     for (int i = 0; i < 128; i++) {
@@ -472,4 +477,29 @@ MpInstrument* InstrumentData::findDupe(SynthContext* synth, const MpInstrument& 
     }
   }
   return nullptr;
+}
+
+void MpInstrument::showParsed(std::ostream& out, std::string indent) const
+{
+  out << indent << displayName() << ":" << std::endl;
+  out << indent << "  Base address: 0x" << std::hex << addr << std::dec << std::endl;
+  if (attack >= 0) {
+    out << indent << "  A=" << int(rom->read<uint8_t>(addr + 8)) << " (" << attack << ")" << std::endl;
+    out << indent << "  D=" << int(rom->read<uint8_t>(addr + 9)) << " (" << decay << ")" << std::endl;
+    out << indent << "  S=" << int(rom->read<uint8_t>(addr + 10)) << " (" << sustain << ")" << std::endl;
+    out << indent << "  R=" << int(rom->read<uint8_t>(addr + 11)) << " (" << release << ")" << std::endl;
+  }
+}
+
+void SplitInstrument::showParsed(std::ostream& out, std::string) const
+{
+  out << displayName() << ":" << std::endl;
+  out << "  Base address: 0x" << std::hex << addr << std::dec << std::endl;
+  int note = 0;
+  for (const auto& split : splits) {
+    if (split.get()) {
+      out << "  " << note << ": " << split->displayName() << std::endl;
+    }
+    note++;
+  }
 }

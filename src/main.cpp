@@ -79,6 +79,7 @@ int main(int argc, char** argv)
     { "validate", "V", "", "Validate songs when scanning" },
     { "table", "t", "location", "Use a specific song table" },
     { "parse", "p", "", "Output parsed sequence data instead of audio" },
+    { "instruments", "i", "", "Output parsed instrument data instead of audio" },
     { "", "", "input", "Path to the input file" },
     { "", "", "song", "Song index or sequence offset" },
   });
@@ -178,6 +179,21 @@ int main(int argc, char** argv)
     } else {
       std::ofstream out(filename);
       sd->showParsed(out);
+    }
+    return 0;
+  } else if (args.hasKey("instruments")) {
+    std::ofstream out;
+    if (!filename.empty()) {
+      out.open(filename);
+    }
+    std::ostream& oout = filename.empty() ? std::cout : out;
+    for (int i = 0; i < 128; i++) {
+      auto inst = sd->getInstrument(i);
+      if (inst) {
+        oout << "Instrument " << i << " - ";
+        inst->showParsed(oout);
+        oout << std::endl;
+      }
     }
     return 0;
   }
