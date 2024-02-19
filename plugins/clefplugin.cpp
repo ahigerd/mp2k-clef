@@ -15,7 +15,7 @@
 // instead of standard library functions to open additional files in order to use
 // the host's virtual filesystem.
 
-static SynthContext* openBySubsong(S2WContext* ctx, std::unique_ptr<ROMFile>& rom, std::unique_ptr<SongData>& songData, const std::string& filename, std::istream& file)
+static SynthContext* openBySubsong(ClefContext* ctx, std::unique_ptr<ROMFile>& rom, std::unique_ptr<SongData>& songData, const std::string& filename, std::istream& file)
 {
   SynthContext* synth = nullptr;
   try {
@@ -84,28 +84,28 @@ static SynthContext* openBySubsong(S2WContext* ctx, std::unique_ptr<ROMFile>& ro
 static std::map<std::string, double> durationCache;
 static std::map<std::string, std::vector<std::string>> subsongCache;
 
-struct S2WPluginInfo {
-  S2WPLUGIN_STATIC_FIELDS
+struct ClefPluginInfo {
+  CLEF_PLUGIN_STATIC_FIELDS
 #ifdef BUILD_CLAP
-  using ClapPlugin = S2WClapPlugin<S2WPluginInfo>;
+  using ClapPlugin = ClefClapPlugin<ClefPluginInfo>;
 #endif
 
   std::unique_ptr<ROMFile> rom;
   std::unique_ptr<SongData> songData;
 
-  static bool isPlayable(std::istream& file) {
+  static bool isPlayable(ClefContext*, const std::string&, std::istream&) {
     // Implementations should check to see if the file is supported.
     // Return false or throw an exception to report failure.
     return true;
   }
 
-  static int sampleRate(S2WContext* ctx, const std::string& filename, std::istream& file) {
+  static int sampleRate(ClefContext* ctx, const std::string& filename, std::istream& file) {
     // Implementations should return the sample rate of the file.
     // This can be hard-coded if the plugin always uses the same sample rate.
     return 32768;
   }
 
-  static double length(S2WContext* ctx, const std::string& filename, std::istream& file) {
+  static double length(ClefContext* ctx, const std::string& filename, std::istream& file) {
     // Implementations should return the length of the file in seconds.
     auto iter = durationCache.find(filename);
     if (iter != durationCache.end()) {
@@ -143,14 +143,14 @@ struct S2WPluginInfo {
     return durationCache[filename];
   }
 
-  static TagMap readTags(S2WContext* ctx, const std::string& filename, std::istream& file) {
+  static TagMap readTags(ClefContext* ctx, const std::string& filename, std::istream& file) {
     // Implementations should read the tags from the file.
     // If the file format does not support embedded tags, consider
     // inheriting from TagsM3UMixin and removing this function.
     return TagMap();
   }
 
-  static std::vector<std::string> getSubsongs(S2WContext* s2w, const std::string& filename, std::istream& file)
+  static std::vector<std::string> getSubsongs(ClefContext* clef, const std::string& filename, std::istream& file)
   {
     std::string base = filename.substr(0, filename.rfind('?'));
 
@@ -159,11 +159,11 @@ struct S2WPluginInfo {
       return iter->second;
     }
     subsongCache[base] = std::vector<std::string>();
-    length(s2w, base, file);
+    length(clef, base, file);
     return subsongCache.at(base);
   }
 
-  SynthContext* prepare(S2WContext* ctx, const std::string& filename, std::istream& file) {
+  SynthContext* prepare(ClefContext* ctx, const std::string& filename, std::istream& file) {
     // Prepare to play the file. Load any necessary data into memory and store any
     // applicable state in members on this plugin object.
 
@@ -181,14 +181,14 @@ struct S2WPluginInfo {
   }
 };
 
-const std::string S2WPluginInfo::version = "0.0.1";
-const std::string S2WPluginInfo::pluginName = "gbamp2wav";
-const std::string S2WPluginInfo::pluginShortName = "gbamp2wav";
-const std::string S2WPluginInfo::author = "Adam Higerd";
-const std::string S2WPluginInfo::url = "https://bitbucket.org/ahigerd/gbamp2wav";
-ConstPairList S2WPluginInfo::extensions = { { "gba", "GBA ROM images (*.gba)" } };
-const std::string S2WPluginInfo::about =
-  "gbamp2wav copyright (C) 2020-2023 Adam Higerd\n"
+const std::string ClefPluginInfo::version = "0.0.1";
+const std::string ClefPluginInfo::pluginName = "mp2k-clef";
+const std::string ClefPluginInfo::pluginShortName = "mp2k-clef";
+const std::string ClefPluginInfo::author = "Adam Higerd";
+const std::string ClefPluginInfo::url = "https://bitbucket.org/ahigerd/mp2k-clef";
+ConstPairList ClefPluginInfo::extensions = { { "gba", "GBA ROM images (*.gba)" } };
+const std::string ClefPluginInfo::about =
+  "mp2k-clef copyright (C) 2020-2023 Adam Higerd\n"
   "Distributed under the MIT license.";
 
-SEQ2WAV_PLUGIN(S2WPluginInfo);
+CLEF_PLUGIN(ClefPluginInfo);

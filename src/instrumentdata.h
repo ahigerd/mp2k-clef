@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include "synth/iinstrument.h"
 class ROMFile;
 class SampleData;

@@ -1,7 +1,7 @@
 #include "instrumentdata.h"
 #include "romfile.h"
 #include "utility.h"
-#include "s2wcontext.h"
+#include "clefcontext.h"
 #include "codec/sampledata.h"
 #include "codec/pcmcodec.h"
 #include "seq/sequenceevent.h"

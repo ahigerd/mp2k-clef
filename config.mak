@@ -1,3 +1,3 @@
-PLUGIN_NAME = gbamp2wav
--include seq2wav/config.mak
--include ../seq2wav/config.mak
+PLUGIN_NAME = mp2k-clef
+-include libclef/config.mak
+-include ../libclef/config.mak

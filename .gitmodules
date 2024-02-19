@@ -1,6 +1,6 @@
-[submodule "seq2wav"]
-	path = seq2wav
-	url = https://bitbucket.org/ahigerd/seq2wav
+[submodule "libclef"]
+	path = libclef
+	url = https://github.com/ahigerd/libclef
 [submodule "clap"]
 	path = plugins/clap
 	url = https://github.com/free-audio/clap.git

@@ -7,18 +7,18 @@ OBJS_D = $(patsubst %.cpp, ../$(BUILDPATH)/%_d.o, $(SOURCES))
 MAIN_R = ../$(BUILDPATH)/main.o
 MAIN_D = ../$(BUILDPATH)/main_d.o
 
-../$(PLUGIN_NAME)$(EXE): ../seq2wav/$(BUILDPATH)/libseq2wav.a $(OBJS_R) $(MAIN_R)
+../$(PLUGIN_NAME)$(EXE): ../libclef/$(BUILDPATH)/libclef.a $(OBJS_R) $(MAIN_R)
 	$(CXX) -o $@ $(MAIN_R) $(OBJS_R) $(LDFLAGS_R)
 	strip $@
 
-../$(PLUGIN_NAME)_d$(EXE): ../seq2wav/$(BUILDPATH)/libseq2wav_d.a $(OBJS_D) $(MAIN_D)
+../$(PLUGIN_NAME)_d$(EXE): ../libclef/$(BUILDPATH)/libclef_d.a $(OBJS_D) $(MAIN_D)
 	$(CXX) -o $@ $(MAIN_D) $(OBJS_D) $(LDFLAGS_D)
 
-../$(BUILDPATH)/lib$(PLUGIN_NAME).a: ../seq2wav/$(BUILDPATH)/libseq2wav.a $(filter-out ../$(BUILDPATH)/main.o,$(OBJS_R))
+../$(BUILDPATH)/lib$(PLUGIN_NAME).a: ../libclef/$(BUILDPATH)/libclef.a $(filter-out ../$(BUILDPATH)/main.o,$(OBJS_R))
 	rm -f $@
 	gcc-ar -rc $@ $(OBJS_R)
 
-../$(BUILDPATH)/lib$(PLUGIN_NAME)_d.a: ../seq2wav/$(BUILDPATH)/libseq2wav_d.a $(filter-out ../$(BUILDPATH)/main_d.o,$(OBJS_R))
+../$(BUILDPATH)/lib$(PLUGIN_NAME)_d.a: ../libclef/$(BUILDPATH)/libclef_d.a $(filter-out ../$(BUILDPATH)/main_d.o,$(OBJS_R))
 	rm -f $@
 	gcc-ar -rc $@ $(OBJS_D)
 

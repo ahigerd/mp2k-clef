@@ -3,7 +3,7 @@
 #include "songdata.h"
 #include "instrumentdata.h"
 #include "utility.h"
-#include "s2wcontext.h"
+#include "clefcontext.h"
 #include "synth/synthcontext.h"
 #include "riffwriter.h"
 #include "commandargs.h"
@@ -17,8 +17,8 @@
 
 static int scanSongTables(const std::string& path, bool doValidate)
 {
-  S2WContext s2w;
-  ROMFile rom(&s2w);
+  ClefContext clef;
+  ROMFile rom(&clef);
   rom.load(nullptr, path);
 
   std::vector<SongTable> sts = rom.findSongTables();
@@ -51,8 +51,8 @@ static int scanSongTables(const std::string& path, bool doValidate)
 
 static int scanAllSongs(const std::string& path)
 {
-  S2WContext s2w;
-  ROMFile rom(&s2w);
+  ClefContext clef;
+  ROMFile rom(&clef);
   rom.load(nullptr, path);
 
   SongTable st = rom.findAllSongs();
@@ -110,9 +110,9 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  S2WContext s2w;
-  SynthContext ctx(&s2w, 32768);
-  ROMFile rom(&s2w);
+  ClefContext clef;
+  SynthContext ctx(&clef, 32768);
+  ROMFile rom(&clef);
   rom.load(&ctx, src);
 
   std::string songSelection = args.positional()[1];

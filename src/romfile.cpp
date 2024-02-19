@@ -17,7 +17,7 @@ ROMFile::BadAccess::BadAccess(uint32_t addr)
   // initializers only
 }
 
-ROMFile::ROMFile(S2WContext* ctx)
+ROMFile::ROMFile(ClefContext* ctx)
 : sampleRate(13379), ctx(ctx)
 {
   // initializers only

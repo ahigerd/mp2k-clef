@@ -1,7 +1,7 @@
-gbamp2wav
+mp2k-clef
 =========
 
-gbamp2wav is a player for MusicPlayer2000 tracks from Game Boy Advance games.
+mp2k-clef is a player for MusicPlayer2000 tracks from Game Boy Advance games.
 
 Building
 --------
@@ -19,8 +19,8 @@ targets are recognized:
 * `foobar`: builds just the Foobar2000 player plugin, if supported.
 * `clap`: builds the CLAP instrument plugin, if supported.
 * `clapdebug`: builds a debug version of the CLAP instrument plugin, if supported.
-* `aud_gbamp2wav_d.dll`: builds a debug version of the Audacious plugin, if supported.
-* `in_gbamp2wav_d.dll`: builds a debug version of the Winamp plugin, if supported.
+* `aud_mp2k-clef_d.dll`: builds a debug version of the Audacious plugin, if supported.
+* `in_mp2k-clef_d.dll`: builds a debug version of the Winamp plugin, if supported.
 
 The following make variables are also recognized:
 
@@ -45,10 +45,10 @@ edited in `msvc.mak`.
 
 License
 -------
-gbamp2wav is copyright (c) 2021-2023 Adam Higerd and distributed under the terms of the
+mp2k-clef is copyright (c) 2021-2024 Adam Higerd and distributed under the terms of the
 [MIT license](LICENSE.md).
 
-This project is based upon seq2wav, copyright (c) 2020-2023 Adam Higerd and distributed
+This project is based upon libclef, copyright (c) 2020-2024 Adam Higerd and distributed
 under the terms of the [MIT license](LICENSE.md).
 
 [CLAP](https://cleveraudio.org/) is an open-source audio plugin format. The

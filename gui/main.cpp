@@ -1,6 +1,6 @@
 #include <QApplication>
 #include "mainwindow.h"
-#include "s2wcontext.h"
+#include "clefcontext.h"
 #include "channelwidget.h"
 #include "playercontrols.h"
 #include "synth/synthcontext.h"
@@ -10,7 +10,7 @@
 class GbampWindow : public MainWindow
 {
 public:
-  GbampWindow(S2WPluginBase* plugin) : MainWindow(plugin)
+  GbampWindow(ClefPluginBase* plugin) : MainWindow(plugin)
   {
     resize(400, 200);
   }
@@ -25,13 +25,13 @@ public:
 
 int main(int argc, char** argv)
 {
-  S2WContext ctx;
-  S2WPluginBase* plugin = S2W::makePlugin(&ctx);
+  ClefContext ctx;
+  ClefPluginBase* plugin = Clef::makePlugin(&ctx);
 
   QCoreApplication::setApplicationName(QString::fromStdString(plugin->pluginName()));
   QCoreApplication::setApplicationVersion(QString::fromStdString(plugin->version()));
-  QCoreApplication::setOrganizationName("seq2wav");
-  QCoreApplication::setOrganizationDomain("seq2wav" + QString::fromStdString(plugin->pluginShortName()));
+  QCoreApplication::setOrganizationName("libclef");
+  QCoreApplication::setOrganizationDomain("libclef" + QString::fromStdString(plugin->pluginShortName()));
   QApplication app(argc, argv);
 
   GbampWindow mw(plugin);
