@@ -44,7 +44,7 @@ public:
 
   inline uint8_t operator[](uint32_t addr) const { return read<uint8_t>(addr); }
   template<typename T> inline T read(uint32_t addr) const {
-    uint32_t cleaned = cleanPointer(addr | 0x08000000, sizeof(T), false);
+    uint32_t cleaned = cleanPointer(addr | baseAddr, sizeof(T), false);
     if (cleaned == BAD_PTR) throw BadAccess(addr);
     return parseInt<T>(rom, cleaned);
   }
