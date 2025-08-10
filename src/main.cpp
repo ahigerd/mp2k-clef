@@ -73,6 +73,8 @@ int main(int argc, char** argv)
     { "parse", "p", "", "Output parsed sequence data instead of audio" },
     { "instruments", "i", "", "Output parsed instrument data instead of audio" },
     { "multiboot", "m", "", "Treat the input file as a multiboot image instead of a ROM" },
+    { "mute", "", "channels", "Comma-separated list of channels to mute" },
+    { "solo", "", "channels", "Comma-separated list of channels to solo" },
     { "", "", "input", "Path to the input file" },
     { "", "", "song", "Song index or sequence offset" },
   });
@@ -191,8 +193,37 @@ int main(int argc, char** argv)
     return 0;
   }
 
+  bool mute[16] = {
+    false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false,
+  };
+  bool solo = args.hasKey("solo");
+  if (solo && args.hasKey("mute")) {
+    std::cerr << "Only one of --mute and --solo may be specified." << std::endl;
+    return 1;
+  } else if (solo || args.hasKey("mute")) {
+    std::string chans(solo ? args.getString("solo") : args.getString("mute"));
+    const char* chanPtr = chans.c_str();
+    const char* chanEnd = chanPtr + chans.size();
+    while (chanPtr < chanEnd) {
+      const char* nextPtr;
+      // Old C function is const-incorrect, but it's the best tool for the job.
+      int chan = std::strtol(chanPtr, const_cast<char**>(&nextPtr), 0);
+      bool error = (nextPtr <= chanPtr || chan < 0 || chan > 15);
+      error = error || !(*nextPtr == ',' || *nextPtr == '\0');
+      if (error) {
+        std::cerr << "Invalid " << (solo ? "solo" : "mute") << " channel list: " << chans << std::endl;
+        return 1;
+      }
+      mute[chan] = true;
+      chanPtr = nextPtr;
+    }
+  }
+
+
   for (int i = 0; i < sd->numTracks(); i++) {
     ctx.addChannel(sd->getTrack(i));
+    ctx.channels[i]->mute = (mute[i] != solo);
   }
 
   if (filename.empty()) {

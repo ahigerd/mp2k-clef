@@ -151,6 +151,7 @@ Channel::Note* MpInstrument::addEnvelope(Channel* channel, Channel::Note* note, 
   double eRelease = release * factor;
   if (expDecay) {
     // fitted using gradient descent
+    // TODO: use DiscreteEnvelope
     static const double COEF = 64.9707;
     static const double ADJ = 1.4875;
     eDecay = eDecay ? std::log(eDecay) * COEF - ADJ : 0;

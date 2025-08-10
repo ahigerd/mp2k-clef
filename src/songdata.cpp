@@ -542,7 +542,6 @@ MpInstrument* SongData::getInstrument(uint8_t id) const
 void SongData::showParsed(std::ostream& out)
 {
   for (const auto& track : tracks) {
-    TrackData* td = static_cast<TrackData*>(track.get());
-    td->showParsed(out);
+    track->showParsed(out);
   }
 }

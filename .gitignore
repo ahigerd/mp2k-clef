@@ -9,6 +9,7 @@
 *.m3u
 
 # build temporaries
+gui/.qmake.stash
 Makefile.d
 *.o
 *.obj
