@@ -115,7 +115,7 @@ std::string RawEvent::render() const {
 }
 
 TrackData::TrackData(SongData* song, int index, uint32_t addr, MpInstrument* defaultInst)
-: trackIndex(index), song(song), addr(addr), hasLoop(true), playIndex(0), playTime(0), secPerTick(1.0 / 75.0),
+: trackIndex(index), song(song), addr(addr), hasLoop(true), preamp(1.0), playIndex(0), playTime(0), secPerTick(1.0 / 75.0),
   lengthCache(-1), currentInstrument(defaultInst), bendRange(2), transpose(0), tuning(0), stopped(false)
 {
   std::unordered_map<uint64_t, size_t> addrToIndex;
@@ -417,9 +417,9 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           pendingEvents.back()->timestamp = playTime;
           break;
         case VOL:
-          pendingEvents.emplace_back(new ChannelEvent(AudioNode::Gain, 2 * event.value / 127.0));
+          pendingEvents.emplace_back(new ChannelEvent(AudioNode::Gain, 2 * preamp * event.value / 127.0));
           pendingEvents.back()->timestamp = playTime;
-          volume = event.value / 127.0;
+          volume = preamp * event.value / 127.0;
           break;
         case BENDR:
           bendRange = event.value;

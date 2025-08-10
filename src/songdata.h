@@ -53,6 +53,7 @@ public:
   SongData* const song;
   const uint32_t addr;
   bool hasLoop;
+  double preamp;
 
   void showParsed(std::ostream& out);
 

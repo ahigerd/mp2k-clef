@@ -75,6 +75,7 @@ int main(int argc, char** argv)
     { "multiboot", "m", "", "Treat the input file as a multiboot image instead of a ROM" },
     { "mute", "", "channels", "Comma-separated list of channels to mute" },
     { "solo", "", "channels", "Comma-separated list of channels to solo" },
+    { "preamp", "", "gain", "Adjust all channel volumes before mixing (default 1.0)" },
     { "", "", "input", "Path to the input file" },
     { "", "", "song", "Song index or sequence offset" },
   });
@@ -222,7 +223,12 @@ int main(int argc, char** argv)
 
 
   for (int i = 0; i < sd->numTracks(); i++) {
-    ctx.addChannel(sd->getTrack(i));
+    TrackData* td = static_cast<TrackData*>(sd->getTrack(i));
+    if (args.hasKey("preamp")) {
+      td->preamp = args.getFloat("preamp");
+      std::cerr << i << " " << td->preamp << std::endl;
+    }
+    ctx.addChannel(td);
     ctx.channels[i]->mute = (mute[i] != solo);
   }
 
