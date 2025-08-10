@@ -132,7 +132,7 @@ SongTable ROMFile::findAllSongs() const
 {
   SongTable result(this);
   int size = rom.size() - 12;
-  for (int offset = 0x200; offset < size; offset += 4) {
+  for (int offset = headerSize; offset < size; offset += 4) {
     if (checkSong(offset)) {
       result.songs.push_back(offset);
       offset += 4;

@@ -384,7 +384,7 @@ SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
 : MpInstrument(rom, addr)
 {
   attack = -1;
-  uint32_t splitAddr = rom->readPointer(0x08000000 | (addr + 4));
+  uint32_t splitAddr = rom->readPointer(rom->baseAddr | (addr + 4));
   if (type == Percussion) {
     for (int i = 0; i < 128; i++) {
       splits.emplace_back(load(rom, splitAddr + 12 * i, true));

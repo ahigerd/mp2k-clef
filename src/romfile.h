@@ -41,6 +41,9 @@ public:
   std::string filename;
   std::vector<uint8_t> rom;
   uint32_t sampleRate;
+  uint32_t baseAddr;
+  uint32_t headerSize;
+  bool multiboot;
 
   inline uint8_t operator[](uint32_t addr) const { return read<uint8_t>(addr); }
   template<typename T> inline T read(uint32_t addr) const {
@@ -65,9 +68,6 @@ private:
 
   ClefContext* ctx;
   SynthContext* synth;
-  uint32_t baseAddr;
-  uint32_t headerSize;
-  bool multiboot;
 };
 
 #endif
