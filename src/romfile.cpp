@@ -23,15 +23,23 @@ ROMFile::ROMFile(ClefContext* ctx)
   // initializers only
 }
 
-void ROMFile::load(SynthContext* synth, const std::string& path)
+void ROMFile::load(SynthContext* synth, const std::string& path, bool multiboot)
 {
   std::ifstream f(path);
-  load(synth, f, path);
+  load(synth, f, path, multiboot);
 }
 
-void ROMFile::load(SynthContext* synth, std::istream& f, const std::string& path)
+void ROMFile::load(SynthContext* synth, std::istream& f, const std::string& path, bool multiboot)
 {
   this->synth = synth;
+  this->multiboot = multiboot;
+  if (multiboot) {
+    baseAddr = 0x02000000;
+    headerSize = 0xC0;
+  } else {
+    baseAddr = 0x08000000;
+    headerSize = 0x200;
+  }
   if (path == filename) {
     return;
   }
@@ -46,15 +54,15 @@ void ROMFile::load(SynthContext* synth, std::istream& f, const std::string& path
 uint32_t ROMFile::cleanPointer(uint32_t addr, uint32_t size, bool align) const
 {
   uint32_t mask = align ? 0xFE000003 : 0xFE000000;
-  if ((addr & mask) != 0x08000000) return BAD_PTR;
-  addr &= 0x07FFFFFF;
-  if (addr < 0x200 || addr > rom.size() - size) return BAD_PTR;
+  if ((addr & mask) != baseAddr) return BAD_PTR;
+  addr &= 0x01FFFFFF;
+  if (addr < headerSize || addr > rom.size() - size) return BAD_PTR;
   return addr;
 }
 
 uint32_t ROMFile::cleanDeref(uint32_t addr, uint32_t size, bool alignTarget, bool alignPointer) const
 {
-  addr = cleanPointer(addr | 0x08000000, 4, alignPointer);
+  addr = cleanPointer(addr | baseAddr, 4, alignPointer);
   if (addr == BAD_PTR) return BAD_PTR;
   return cleanPointer(parseInt<uint32_t>(rom, addr), size, alignTarget);
 }
@@ -68,7 +76,7 @@ SongTable ROMFile::findSongTable(int minSongs, uint32_t offset) const
   offset -= 4;
   int badCount = 0;
   while ((offset += 4) < size) {
-    uint32_t addr = cleanDeref(offset | 0x08000000, 12);
+    uint32_t addr = cleanDeref(offset, 12);
     if (addr != BAD_PTR && !checkSong(addr, false)) {
       addr = BAD_PTR;
     }
@@ -143,9 +151,6 @@ bool ROMFile::checkSong(uint32_t addr, bool deep) const
       return false;
     }
     for (int p = addr + 4; p < end; p += 4) {
-      if ((rom[p + 3] & 0xFE) != 0x08) {
-        return false;
-      }
       uint32_t data = cleanDeref(p, 12, false);
       if (data == BAD_PTR) return false;
       if (!deep) continue;

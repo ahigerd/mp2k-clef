@@ -27,8 +27,8 @@ public:
   ROMFile& operator=(const ROMFile& other) = delete;
   ROMFile& operator=(ROMFile&& other) = delete;
 
-  void load(SynthContext* synth, const std::string& path);
-  void load(SynthContext* synth, std::istream& stream, const std::string& path);
+  void load(SynthContext* synth, const std::string& path, bool multiboot = false);
+  void load(SynthContext* synth, std::istream& stream, const std::string& path, bool multiboot = false);
 
   inline ClefContext* context() const { return ctx; }
   inline SynthContext* synthContext() const { return synth; }
@@ -65,6 +65,9 @@ private:
 
   ClefContext* ctx;
   SynthContext* synth;
+  uint32_t baseAddr;
+  uint32_t headerSize;
+  bool multiboot;
 };
 
 #endif

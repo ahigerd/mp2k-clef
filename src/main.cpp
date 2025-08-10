@@ -15,12 +15,8 @@
 #include <cstdlib>
 #include <sstream>
 
-static int scanSongTables(const std::string& path, bool doValidate)
+static int scanSongTables(const ROMFile& rom, bool doValidate)
 {
-  ClefContext clef;
-  ROMFile rom(&clef);
-  rom.load(nullptr, path);
-
   std::vector<SongTable> sts = rom.findSongTables();
   if (sts.empty()) {
     std::cerr << "No song tables found." << std::endl;
@@ -49,12 +45,8 @@ static int scanSongTables(const std::string& path, bool doValidate)
   return 0;
 }
 
-static int scanAllSongs(const std::string& path)
+static int scanAllSongs(const ROMFile& rom)
 {
-  ClefContext clef;
-  ROMFile rom(&clef);
-  rom.load(nullptr, path);
-
   SongTable st = rom.findAllSongs();
   if (st.songs.empty()) {
     std::cerr << "No songs found." << std::endl;
@@ -80,6 +72,7 @@ int main(int argc, char** argv)
     { "table", "t", "location", "Use a specific song table" },
     { "parse", "p", "", "Output parsed sequence data instead of audio" },
     { "instruments", "i", "", "Output parsed instrument data instead of audio" },
+    { "multiboot", "m", "", "Treat the input file as a multiboot image instead of a ROM" },
     { "", "", "input", "Path to the input file" },
     { "", "", "song", "Song index or sequence offset" },
   });
@@ -97,23 +90,23 @@ int main(int argc, char** argv)
 
   std::string src = args.positional()[0];
 
+  ClefContext clef;
+  SynthContext ctx(&clef, 32768);
+  ROMFile rom(&clef);
+  rom.load(&ctx, src, args.hasKey("multiboot"));
+
   if (args.hasKey("scan")) {
-    return scanSongTables(src, args.hasKey("validate"));
+    return scanSongTables(rom, args.hasKey("validate"));
   }
 
   if (args.hasKey("scan-songs")) {
-    return scanAllSongs(src);
+    return scanAllSongs(rom);
   }
 
   if (args.positional().size() < 2) {
     std::cerr << args.usageText(argv[0]) << std::endl;
     return 1;
   }
-
-  ClefContext clef;
-  SynthContext ctx(&clef, 32768);
-  ROMFile rom(&clef);
-  rom.load(&ctx, src);
 
   std::string songSelection = args.positional()[1];
 

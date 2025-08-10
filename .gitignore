@@ -9,6 +9,7 @@
 *.m3u
 
 # build temporaries
+Makefile.d
 *.o
 *.obj
 *.exp
@@ -21,8 +22,8 @@ core
 # build outputs
 depends.mak
 include
-*2wav
-*2wav_d
+mp2k-clef
+mp2k-clef_d
 *.dll
 *.a
 *.so
