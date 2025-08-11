@@ -88,18 +88,19 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
   }
 
   uint8_t normType = type;
-  if (normType < 0x10) {
-    normType &= 0x7;
-  }
   try {
     switch (normType) {
       case GBSample:
+      case GBSample_Alt:
       case Sample:
       case FixedSample:
         return new SampleInstrument(rom, addr);
       case Square1:
+      case Square1_Alt:
       case Square2:
+      case Square2_Alt:
       case Noise:
+      case Noise_Alt:
         return new PSGInstrument(rom, addr);
       case KeySplit:
       case Percussion:
@@ -122,8 +123,8 @@ MpInstrument* MpInstrument::load(const ROMFile* rom, uint32_t addr, bool isSplit
 MpInstrument::MpInstrument(const ROMFile* rom, uint32_t addr)
 : rom(rom), addr(addr), type(Type(rom->read<uint8_t>(addr))), forcePan(false), pan(0), gate(0)
 {
-  if (type & 0x7) {
-    type = Type(type & 0x7);
+  if (type < 16 && type != 0 && type != 8) {
+    type = Type(type);
     attack = (rom->read<uint8_t>(addr + 8) & 0x7) / 7.0;
     decay = rom->read<uint8_t>(addr + 9) / 60.0;
     sustain = rom->read<uint8_t>(addr + 10) / 15.0;
@@ -255,6 +256,8 @@ std::string SampleInstrument::displayName() const
   std::ostringstream ss;
   if (type == GBSample) {
     ss << "Waveform";
+  } else if (type == GBSample_Alt) {
+    ss << "Waveform (Alt)";
   } else {
     ss << "Sample";
   }
@@ -296,7 +299,7 @@ Channel::Note* SampleInstrument::noteEvent(Channel* channel, std::shared_ptr<Bas
 PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
 : MpInstrument(rom, addr), sweep(0)
 {
-  if (type == Square1) {
+  if (type == Square1 || type == Square1_Alt) {
     sweep = rom->read<uint8_t>(addr + 3);
   }
   mode = rom->read<uint8_t>(addr + 4);
@@ -314,8 +317,16 @@ PSGInstrument::PSGInstrument(const ROMFile* rom, uint32_t addr)
 std::string PSGInstrument::displayName() const
 {
   std::ostringstream ss;
-  if (type == Square1 || type == Square2) {
-    ss << "Square ";
+  if (type == Square1 || type == Square1_Alt || type == Square2 || type == Square2_Alt) {
+    if (type == Square1) {
+      ss << "Square 1 ";
+    } else if (type == Square1_Alt) {
+      ss << "Square 1 (Alt) ";
+    } else if (type == Square2) {
+      ss << "Square 2 ";
+    } else if (type == Square2_Alt) {
+      ss << "Square 2 (Alt) ";
+    }
     if (mode == 0) {
       ss << "(12.5%)";
     } else if (mode == 1) {
@@ -327,6 +338,8 @@ std::string PSGInstrument::displayName() const
     }
   } else if (type == Noise) {
     ss << "Noise (type " << int(mode) << ")";
+  } else if (type == Noise_Alt) {
+    ss << "Noise (Alt) (type " << int(mode) << ")";
   } else {
     ss << "PSG (type " << int(type) << ")";
   }
@@ -485,6 +498,21 @@ void MpInstrument::showParsed(std::ostream& out, std::string indent) const
   out << indent << displayName() << ":" << std::endl;
   out << indent << "  Base address: 0x" << std::hex << addr << std::dec << std::endl;
   if (attack >= 0) {
+    out << indent << "  Base key=" << int(rom->read<uint8_t>(addr + 1)) << std::endl;
+    if (type == Square1 || type == Square1_Alt || type == Square2 || type == Square2_Alt || type == GBSample || type == GBSample_Alt
+      || type == Noise || type == Noise_Alt) {
+        out << indent << "  Gate=" << int(rom->read<uint8_t>(addr + 2)) << std::endl;
+        if (type == Square1 || type == Square1_Alt) {
+          out << indent << "  Sweep=" << int(rom->read<uint8_t>(addr + 3)) << std::endl;
+        }
+    } else {
+      int pan = rom->read<uint8_t>(addr + 2);
+      if (pan == 0) {
+        out << indent << "  Pan=" << pan << std::endl;
+      } else {
+        out << indent << "  Pan=" << (pan | 0x80) << std::endl;
+      }
+    }
     out << indent << "  A=" << int(rom->read<uint8_t>(addr + 8)) << " (" << attack << ")" << std::endl;
     out << indent << "  D=" << int(rom->read<uint8_t>(addr + 9)) << " (" << decay << ")" << std::endl;
     out << indent << "  S=" << int(rom->read<uint8_t>(addr + 10)) << " (" << sustain << ")" << std::endl;
