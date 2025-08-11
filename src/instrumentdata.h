@@ -27,6 +27,10 @@ public:
     GBSample = 3,
     Noise = 4,
     FixedSample = 8,
+    Square1_Alt = 9,
+    Square2_Alt = 10,
+    GBSample_Alt = 11,
+    Noise_Alt = 12,
     KeySplit = 0x40,
     Percussion = 0x80,
   };
