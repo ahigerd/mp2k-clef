@@ -477,6 +477,8 @@ std::shared_ptr<SequenceEvent> TrackData::readNextEvent()
           pendingEvents.emplace_back(noteEvent);
         }
       }
+    } else if (event.type == Mp2kEvent::Note) {
+      std::cerr << "note without valid instrument" << std::endl;
     }
   }
   if (isFinished()) {

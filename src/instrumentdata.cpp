@@ -362,12 +362,34 @@ Channel::Note* PSGInstrument::noteEvent(Channel* channel, std::shared_ptr<BaseNo
   } else if (mode == 3) {
     waveformID = BaseOscillator::Square75;
   }
+  double pitch = static_cast<InstrumentNoteEvent*>(event.get())->pitch;
+  double freq;
+  if (type == Noise) {
+    constexpr double ln_8 = std::log(8.0);
+    constexpr double ln_2 = std::log(2.0);
+    if (pitch < 76) {
+      freq = 4096 * fastExp((pitch - 60) / 12, ln_8);
+    } else if (pitch < 78) {
+      freq = 65536 * fastExp((pitch - 76) / 2, ln_2);
+    } else if (pitch < 80) {
+      freq = 131072 * fastExp(pitch - 78, ln_2);
+    } else {
+      freq = 524288;
+    }
+    if (freq < 4.5714) {
+      freq = 4.5714;
+    }
+    // TODO: Why is the *8 necessary to pull this into the right range?
+    freq = 8 * 262144.0 / freq;
+  } else {
+    freq = noteToFreq(pitch);
+  }
   // TODO: velocity accuracy
   double volume = event->volume * 0.3;
   std::shared_ptr<AudioNode> node(BaseOscillator::create(
       channel->ctx,
       waveformID,
-      noteToFreq(static_cast<InstrumentNoteEvent*>(event.get())->pitch),
+      freq,
       volume,
       event->pan
   ));
@@ -390,7 +412,7 @@ SplitInstrument::SplitInstrument(const ROMFile* rom, uint32_t addr)
       splits.emplace_back(load(rom, splitAddr + 12 * i, true));
     }
   } else {
-    uint32_t tableAddr = rom->readPointer(addr + 8);
+    uint32_t tableAddr = rom->readPointer(rom->baseAddr | (addr + 8));
     for (int i = 0; i < 128; i++) {
       int n = rom->read<uint8_t>(tableAddr + i);
       splits.emplace_back(load(rom, splitAddr + 12 * n, true));
@@ -415,6 +437,12 @@ BaseNoteEvent* SplitInstrument::makeEvent(double volume, uint8_t key, uint8_t ve
   auto split = splits.at(key).get();
   if (!split) {
     return nullptr;
+  }
+  if (type == Percussion) {
+    uint8_t baseKey = (*rom)[addr + 1];
+    if (baseKey > 0) {
+      key = baseKey;
+    }
   }
   BaseNoteEvent* event = split->makeEvent(volume, key, vel, len);
   if (split->forcePan && split->pan != 64) {
@@ -496,6 +524,12 @@ void SplitInstrument::showParsed(std::ostream& out, std::string) const
 {
   out << displayName() << ":" << std::endl;
   out << "  Base address: 0x" << std::hex << addr << std::dec << std::endl;
+  uint32_t splitAddr = rom->readPointer(rom->baseAddr | (addr + 4));
+  out << "  Instruments:  0x" << std::hex << splitAddr << std::dec << std::endl;
+  if (type == KeySplit) {
+    uint32_t tableAddr = rom->readPointer(rom->baseAddr | (addr + 8));
+    out << "  Split table:  0x" << std::hex << tableAddr << std::dec << std::endl;
+  }
   int note = 0;
   for (const auto& split : splits) {
     if (split.get()) {
